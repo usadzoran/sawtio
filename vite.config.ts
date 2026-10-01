@@ -169,8 +169,10 @@ function vitePluginPublicPlatformConfig(): Plugin {
 }
 
 const plugins = [vitePluginPublicPlatformConfig(), react(), tailwindcss(), jsxLocPlugin(), vitePluginManusDebugCollector()];
+const isGitHubPagesBuild = process.env.GITHUB_PAGES === "true";
 
 export default defineConfig({
+  base: isGitHubPagesBuild ? "/sawtio/" : "/",
   plugins,
   resolve: {
     alias: {

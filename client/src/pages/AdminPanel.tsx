@@ -71,14 +71,14 @@ export default function AdminPanel() {
     return <div className="admin-state"><Loader2 className="spin" size={25} /><span>جارٍ التحقق من صلاحيات الإدارة…</span></div>;
   }
   if (!user) {
-    return <div className="admin-state"><ShieldAlert size={28} /><h1>تسجيل الدخول مطلوب</h1><p>هذه الصفحة متاحة لفريق إدارة Sawtio فقط.</p><a className="admin-back" href="/">العودة إلى Sawtio <ArrowUpLeft size={16} /></a></div>;
+    return <div className="admin-state"><ShieldAlert size={28} /><h1>تسجيل الدخول مطلوب</h1><p>هذه الصفحة متاحة لفريق إدارة Sawtio فقط.</p><a className="admin-back" href="#/">العودة إلى Sawtio <ArrowUpLeft size={16} /></a></div>;
   }
   if (!isAdmin) {
-    return <div className="admin-state"><ShieldAlert size={28} /><h1>ليس لديك صلاحية الإدارة</h1><p>حسابك مسجل، لكن دوره لا يسمح بمراقبة بيانات المستخدمين أو الرسائل.</p><a className="admin-back" href="/">العودة إلى Sawtio <ArrowUpLeft size={16} /></a></div>;
+    return <div className="admin-state"><ShieldAlert size={28} /><h1>ليس لديك صلاحية الإدارة</h1><p>حسابك مسجل، لكن دوره لا يسمح بمراقبة بيانات المستخدمين أو الرسائل.</p><a className="admin-back" href="#/">العودة إلى Sawtio <ArrowUpLeft size={16} /></a></div>;
   }
 
   return <div className="admin-app" dir="rtl">
-    <header className="admin-topbar"><div className="admin-brand"><div className="admin-brand-mark"><Volume2 size={18} /></div><div><strong>Sawtio Control</strong><small>لوحة الإدارة والمراقبة</small></div></div><div className="admin-actions"><span className="admin-live-dot"><i /> اتصال قاعدة البيانات نشط</span><button type="button" className="admin-refresh" onClick={() => void loadDashboard()} disabled={refreshing}><RefreshCw size={15} className={refreshing ? "spin" : ""} /> تحديث</button><a href="/" className="admin-back">العودة للموقع <ArrowUpLeft size={15} /></a></div></header>
+    <header className="admin-topbar"><div className="admin-brand"><div className="admin-brand-mark"><Volume2 size={18} /></div><div><strong>Sawtio Control</strong><small>لوحة الإدارة والمراقبة</small></div></div><div className="admin-actions"><span className="admin-live-dot"><i /> اتصال قاعدة البيانات نشط</span><button type="button" className="admin-refresh" onClick={() => void loadDashboard()} disabled={refreshing}><RefreshCw size={15} className={refreshing ? "spin" : ""} /> تحديث</button><a href="#/" className="admin-back">العودة للموقع <ArrowUpLeft size={15} /></a></div></header>
     <main className="admin-main"><div className="admin-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> مساحة محمية</div><h1>نظرة على Sawtio.</h1><p>مراقبة تشغيلية للبيانات الحقيقية من Supabase، بدون عرض أي محتوى للزوار العاديين.</p></div><div className="admin-identity"><span>مدير النظام</span><strong>{user.email}</strong></div></div>
       {error && <div className="admin-alert"><ShieldAlert size={16} /> {error}</div>}
       <section className="admin-stats"><article><span className="admin-stat-icon coral"><Users size={18} /></span><div><small>المستخدمون</small><strong>{profiles.length}</strong></div></article><article><span className="admin-stat-icon teal"><Volume2 size={18} /></span><div><small>الغرف المباشرة</small><strong>{activeRooms}</strong></div></article><article><span className="admin-stat-icon violet"><MessageSquare size={18} /></span><div><small>رسائل الغرف</small><strong>{roomMessages.length}</strong></div></article><article><span className="admin-stat-icon amber"><DoorOpen size={18} /></span><div><small>المديرون</small><strong>{admins}</strong></div></article></section>
