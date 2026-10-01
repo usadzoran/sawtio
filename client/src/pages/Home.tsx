@@ -1,4 +1,5 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { supabase, type SupabaseRoomRow } from "@/lib/supabase";
 import { toast } from "sonner";
 import {
   ArrowUpLeft,
@@ -120,6 +121,26 @@ const initialRooms: Room[] = [
 ];
 
 const categories = ["الكل", "الأكثر نشاطًا", "تقنية", "ثقافة", "صباحي"];
+const roomAccents = new Set<Room["accent"]>(["coral", "teal", "violet", "amber"]);
+
+function normalizeRoom(row: SupabaseRoomRow): Room {
+  const members = Array.isArray(row.members) ? row.members : [];
+  const accent = roomAccents.has(row.accent as Room["accent"]) ? row.accent as Room["accent"] : "coral";
+  return {
+    id: row.id,
+    title: row.title,
+    topic: row.topic,
+    category: row.category,
+    listeners: row.listeners,
+    status: row.status,
+    accent,
+    host: row.host,
+    hostInitials: row.host_initials,
+    hostTone: row.host_tone,
+    private: row.private,
+    members,
+  };
+}
 
 function Avatar({ initials, tone, speaking = false, size = "normal" }: { initials: string; tone: string; speaking?: boolean; size?: "small" | "normal" | "large" }) {
   return (
@@ -181,6 +202,8 @@ export default function Home() {
   const [micEnabled, setMicEnabled] = useState(false);
   const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const [speakerEnabled, setSpeakerEnabled] = useState(true);
+  const [databaseState, setDatabaseState] = useState<"loading" | "connected" | "fallback">(supabase ? "loading" : "fallback");
+  const [isSavingRoom, setIsSavingRoom] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [newRoomTitle, setNewRoomTitle] = useState("");
@@ -188,6 +211,41 @@ export default function Home() {
   const [isPrivate, setIsPrivate] = useState(false);
 
   const currentRoom = rooms.find((room) => room.id === currentRoomId) ?? rooms[0];
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client) {
+      setDatabaseState("fallback");
+      return;
+    }
+
+    let cancelled = false;
+    const loadRooms = async () => {
+      const { data, error } = await client
+        .from("rooms")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (cancelled) return;
+      if (error) {
+        console.warn("[Sawtio] Supabase rooms unavailable:", error.message);
+        setDatabaseState("fallback");
+        return;
+      }
+      if (data?.length) {
+        const loadedRooms = data.map((row) => normalizeRoom(row as SupabaseRoomRow));
+        setRooms(loadedRooms);
+        setCurrentRoomId(loadedRooms[0].id);
+      }
+      setDatabaseState("connected");
+    };
+
+    void loadRooms();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredRooms = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -246,16 +304,15 @@ export default function Home() {
     setMicEnabled(false);
   };
 
-  const handleCreateRoom = (event: FormEvent<HTMLFormElement>) => {
+  const handleCreateRoom = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedTitle = newRoomTitle.trim();
     if (!trimmedTitle) {
       toast.error("أضف اسمًا للغرفة أولًا");
       return;
     }
-    const id = `room-${Date.now()}`;
-    const newRoom: Room = {
-      id,
+    const draftRoom: Room = {
+      id: `room-${Date.now()}`,
       title: trimmedTitle,
       topic: newRoomTopic,
       category: "الأكثر نشاطًا",
@@ -268,13 +325,48 @@ export default function Home() {
       private: isPrivate,
       members: [{ name: "أنت", role: "مضيف", initials: "أنت", tone: "tone-coral", speaking: true }],
     };
-    setRooms((value) => [newRoom, ...value]);
-    setCurrentRoomId(id);
-    setJoined(true);
-    setIsCreateOpen(false);
-    setNewRoomTitle("");
-    setIsPrivate(false);
-    toast.success("غرفتك أصبحت مباشرة", { description: "شاركها مع أصدقائك وابدأ الحوار." });
+    setIsSavingRoom(true);
+    let roomToAdd = draftRoom;
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("rooms")
+          .insert({
+            title: draftRoom.title,
+            topic: draftRoom.topic,
+            category: draftRoom.category,
+            listeners: draftRoom.listeners,
+            status: draftRoom.status,
+            accent: draftRoom.accent,
+            host: draftRoom.host,
+            host_initials: draftRoom.hostInitials,
+            host_tone: draftRoom.hostTone,
+            private: draftRoom.private,
+            members: draftRoom.members,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.warn("[Sawtio] Room was not persisted:", error.message);
+          setDatabaseState("fallback");
+          toast.warning("تم فتح الغرفة في وضع المعاينة", { description: "شغّل supabase/schema.sql لتفعيل الحفظ الدائم." });
+        } else if (data) {
+          roomToAdd = normalizeRoom(data as SupabaseRoomRow);
+          setDatabaseState("connected");
+        }
+      }
+
+      setRooms((value) => [roomToAdd, ...value]);
+      setCurrentRoomId(roomToAdd.id);
+      setJoined(true);
+      setIsCreateOpen(false);
+      setNewRoomTitle("");
+      setIsPrivate(false);
+      toast.success("غرفتك أصبحت مباشرة", { description: "شاركها مع أصدقائك وابدأ الحوار." });
+    } finally {
+      setIsSavingRoom(false);
+    }
   };
 
   return (
@@ -336,7 +428,7 @@ export default function Home() {
               <h1>اسمع، شارك، <em>وكن حاضرًا.</em></h1>
               <p>الغرفة المناسبة قد تبدأ بسؤال صغير.</p>
             </div>
-            <button className="create-button" type="button" onClick={() => setIsCreateOpen(true)}><Plus size={17} /> أنشئ غرفة</button>
+            <div className="heading-actions"><div className={`database-badge ${databaseState}`}><span /> {databaseState === "loading" ? "جاري الاتصال" : databaseState === "connected" ? "Supabase متصلة" : "وضع العرض المحلي"}</div><button className="create-button" type="button" onClick={() => setIsCreateOpen(true)}><Plus size={17} /> أنشئ غرفة</button></div>
           </div>
 
           <section className="feature-room" aria-label="الغرفة المميزة">
@@ -379,7 +471,7 @@ export default function Home() {
         <footer className="page-footer"><span>© 2025 Sawtio</span><span>صُنع للحكايات التي تستحق أن تُسمع</span><span><a href="#help">مركز المساعدة</a><a href="#privacy">الخصوصية</a></span></footer>
       </main>
 
-      {isCreateOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setIsCreateOpen(false); }}><form className="create-dialog" onSubmit={handleCreateRoom}><button className="dialog-close" type="button" onClick={() => setIsCreateOpen(false)} aria-label="إغلاق"><X size={18} /></button><div className="dialog-icon"><Radio size={22} /></div><div className="eyebrow compact"><span className="eyebrow-line" /> غرفة جديدة</div><h2>ما الفكرة التي تستحق صوتًا؟</h2><p>اصنع مساحة صغيرة لحوار كبير، وابدأها بطريقتك.</p><label>اسم الغرفة<input autoFocus value={newRoomTitle} onChange={(event) => setNewRoomTitle(event.target.value)} placeholder="مثال: جلسة شاي وموسيقى" /></label><label>موضوع الغرفة<select value={newRoomTopic} onChange={(event) => setNewRoomTopic(event.target.value)}><option>مجتمع</option><option>تصميم وتقنية</option><option>كتب وثقافة</option><option>رفاهية</option><option>صباحي</option></select></label><label className="privacy-toggle"><span className="toggle-copy"><strong>غرفة خاصة</strong><small>يمكن للأشخاص المدعوين فقط الدخول</small></span><input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} /><i className="toggle-track"><b /></i><LockKeyhole size={16} /></label><button className="dialog-submit" type="submit">ابدأ الغرفة <ArrowUpLeft size={17} /></button></form></div>}
+      {isCreateOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setIsCreateOpen(false); }}><form className="create-dialog" onSubmit={handleCreateRoom}><button className="dialog-close" type="button" onClick={() => setIsCreateOpen(false)} aria-label="إغلاق"><X size={18} /></button><div className="dialog-icon"><Radio size={22} /></div><div className="eyebrow compact"><span className="eyebrow-line" /> غرفة جديدة</div><h2>ما الفكرة التي تستحق صوتًا؟</h2><p>اصنع مساحة صغيرة لحوار كبير، وابدأها بطريقتك.</p><label>اسم الغرفة<input autoFocus value={newRoomTitle} onChange={(event) => setNewRoomTitle(event.target.value)} placeholder="مثال: جلسة شاي وموسيقى" /></label><label>موضوع الغرفة<select value={newRoomTopic} onChange={(event) => setNewRoomTopic(event.target.value)}><option>مجتمع</option><option>تصميم وتقنية</option><option>كتب وثقافة</option><option>رفاهية</option><option>صباحي</option></select></label><label className="privacy-toggle"><span className="toggle-copy"><strong>غرفة خاصة</strong><small>يمكن للأشخاص المدعوين فقط الدخول</small></span><input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} /><i className="toggle-track"><b /></i><LockKeyhole size={16} /></label><button className="dialog-submit" type="submit" disabled={isSavingRoom}>{isSavingRoom ? "جارٍ حفظ الغرفة…" : <>ابدأ الغرفة <ArrowUpLeft size={17} /></>}</button></form></div>}
     </div>
   );
 }

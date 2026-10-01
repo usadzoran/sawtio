@@ -32,3 +32,9 @@
 - `public/manus-routes.json`: خريطة مسارات الموقع المطلوبة من المنصة.
 - `server/_core/index.ts`: خادم Express ومسار الصحة الحالي.
 - `drizzle/schema.ts`: مخطط البيانات الحالي مع قابلية إضافة جداول الغرف والأعضاء لاحقًا.
+
+## تكامل Supabase
+- يستخدم العميل `@supabase/supabase-js` من `client/src/lib/supabase.ts`، ولا يحتوي المستودع على أي قيمة اتصال فعلية.
+- تُدار `VITE_SUPABASE_URL` و`VITE_SUPABASE_ANON_KEY` عبر أسرار Webdev؛ يستخدم الموقع publishable/anon key فقط، ولا يستخدم `SUPABASE_SECRET_KEY` في المتصفح أو الخادم.
+- تُقرأ الغرف من جدول `public.rooms` عند بدء الصفحة، ويُحفظ إنشاء الغرف الجديدة في Supabase. عند تعذر الجدول أو الشبكة تبقى تجربة العرض المحلية متاحة مع توضيح الحالة للمستخدم.
+- ملف `supabase/schema.sql` يعرّف الجدول، فهارس الوقت، ومنح وسياسات RLS اللازمة للقراءة والإضافة من المفتاح العام.
