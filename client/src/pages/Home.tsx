@@ -1,25 +1,385 @@
-import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { Streamdown } from 'streamdown';
+import { FormEvent, useMemo, useState } from "react";
+import { toast } from "sonner";
+import {
+  ArrowUpLeft,
+  Bell,
+  ChevronDown,
+  ChevronLeft,
+  CircleHelp,
+  Headphones,
+  Home as HomeIcon,
+  LayoutGrid,
+  LockKeyhole,
+  Menu,
+  Mic,
+  MicOff,
+  MoreHorizontal,
+  Plus,
+  Radio,
+  Search,
+  Settings,
+  Sparkles,
+  Speaker,
+  VolumeX,
+  Users,
+  Volume2,
+  X,
+} from "lucide-react";
 
-/**
- * All content in this page are only for example, replace with your own feature implementation
- * When building pages, remember your instructions in Frontend Workflow, Frontend Best Practices, Design Guide and Common Pitfalls
- */
+type Member = {
+  name: string;
+  role: "مضيف" | "متحدث" | "مستمع";
+  initials: string;
+  tone: string;
+  speaking?: boolean;
+};
+
+type Room = {
+  id: string;
+  title: string;
+  topic: string;
+  category: string;
+  listeners: number;
+  status: string;
+  accent: "coral" | "teal" | "violet" | "amber";
+  host: string;
+  hostInitials: string;
+  hostTone: string;
+  members: Member[];
+  private?: boolean;
+};
+
+const initialRooms: Room[] = [
+  {
+    id: "pulse-cairo",
+    title: "نبض القاهرة: حكايات المدينة التي لا تنام",
+    topic: "مجتمع",
+    category: "الأكثر نشاطًا",
+    listeners: 128,
+    status: "مباشر الآن",
+    accent: "coral",
+    host: "سارة منصور",
+    hostInitials: "سم",
+    hostTone: "tone-sunset",
+    members: [
+      { name: "سارة منصور", role: "مضيف", initials: "سم", tone: "tone-sunset", speaking: true },
+      { name: "عمر خالد", role: "متحدث", initials: "عخ", tone: "tone-ocean", speaking: true },
+      { name: "ليان عبد الله", role: "متحدث", initials: "لع", tone: "tone-lilac" },
+      { name: "مازن ناصر", role: "مستمع", initials: "من", tone: "tone-mint" },
+    ],
+  },
+  {
+    id: "design-table",
+    title: "طاولة المصممين: ما بعد الذكاء الاصطناعي",
+    topic: "تصميم وتقنية",
+    category: "تقنية",
+    listeners: 84,
+    status: "مباشر الآن",
+    accent: "teal",
+    host: "يوسف قاسم",
+    hostInitials: "يق",
+    hostTone: "tone-ocean",
+    members: [
+      { name: "يوسف قاسم", role: "مضيف", initials: "يق", tone: "tone-ocean", speaking: true },
+      { name: "نور الشريف", role: "متحدث", initials: "نش", tone: "tone-lilac" },
+      { name: "هند مراد", role: "مستمع", initials: "هم", tone: "tone-rose" },
+    ],
+  },
+  {
+    id: "morning-notes",
+    title: "ملاحظات الصباح: كيف نصنع يومًا أخف؟",
+    topic: "رفاهية",
+    category: "صباحي",
+    listeners: 42,
+    status: "مباشر الآن",
+    accent: "amber",
+    host: "ريم عادل",
+    hostInitials: "رع",
+    hostTone: "tone-honey",
+    members: [
+      { name: "ريم عادل", role: "مضيف", initials: "رع", tone: "tone-honey", speaking: true },
+      { name: "إياد فهد", role: "متحدث", initials: "إف", tone: "tone-mint" },
+    ],
+  },
+  {
+    id: "book-club",
+    title: "نادي الصفحة الأخيرة: روايات تستحق الوقت",
+    topic: "كتب وثقافة",
+    category: "ثقافة",
+    listeners: 31,
+    status: "مباشر الآن",
+    accent: "violet",
+    host: "نادر شوقي",
+    hostInitials: "نش",
+    hostTone: "tone-lilac",
+    members: [
+      { name: "نادر شوقي", role: "مضيف", initials: "نش", tone: "tone-lilac" },
+      { name: "جنى فوزي", role: "متحدث", initials: "جف", tone: "tone-rose" },
+    ],
+  },
+];
+
+const categories = ["الكل", "الأكثر نشاطًا", "تقنية", "ثقافة", "صباحي"];
+
+function Avatar({ initials, tone, speaking = false, size = "normal" }: { initials: string; tone: string; speaking?: boolean; size?: "small" | "normal" | "large" }) {
+  return (
+    <div className={`avatar ${tone} avatar-${size} ${speaking ? "is-speaking" : ""}`}>
+      <span>{initials}</span>
+      {speaking && <i className="speaking-dot" />}
+    </div>
+  );
+}
+
+function BrandMark() {
+  return (
+    <div className="brand-lockup">
+      <div className="brand-mark" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+      <div>
+        <strong>Sawtio</strong>
+        <small>مساحتك الصوتية</small>
+      </div>
+    </div>
+  );
+}
+
+function RoomCard({ room, selected, onSelect }: { room: Room; selected: boolean; onSelect: () => void }) {
+  return (
+    <button className={`room-card ${selected ? "selected" : ""}`} onClick={onSelect} type="button">
+      <div className={`room-art art-${room.accent}`}>
+        <Radio size={19} strokeWidth={1.8} />
+        <span className="room-live-dot" />
+      </div>
+        <div className="room-card-body">
+          <div className="room-card-meta">
+            <span className="live-label"><i /> {room.status}</span>
+            <span>{room.private && <LockKeyhole size={10} />} {room.private ? "خاصة" : room.topic}</span>
+        </div>
+        <h3>{room.title}</h3>
+        <div className="room-card-footer">
+          <div className="mini-host">
+            <Avatar initials={room.hostInitials} tone={room.hostTone} size="small" />
+            <span>{room.host}</span>
+          </div>
+          <span className="listener-count"><Users size={14} /> {room.listeners}</span>
+        </div>
+      </div>
+      <ChevronLeft className="room-arrow" size={18} />
+    </button>
+  );
+}
+
 export default function Home() {
-  // If theme is switchable in App.tsx, we can implement theme toggling like this:
-  // const { theme, toggleTheme } = useTheme();
+  const [rooms, setRooms] = useState<Room[]>(initialRooms);
+  const [currentRoomId, setCurrentRoomId] = useState("pulse-cairo");
+  const [activeCategory, setActiveCategory] = useState("الكل");
+  const [search, setSearch] = useState("");
+  const [joined, setJoined] = useState(false);
+  const [micEnabled, setMicEnabled] = useState(false);
+  const [micStream, setMicStream] = useState<MediaStream | null>(null);
+  const [speakerEnabled, setSpeakerEnabled] = useState(true);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [newRoomTitle, setNewRoomTitle] = useState("");
+  const [newRoomTopic, setNewRoomTopic] = useState("مجتمع");
+  const [isPrivate, setIsPrivate] = useState(false);
+
+  const currentRoom = rooms.find((room) => room.id === currentRoomId) ?? rooms[0];
+
+  const filteredRooms = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return rooms.filter((room) => {
+      const matchesCategory = activeCategory === "الكل" || room.category === activeCategory;
+      const matchesSearch = !query || `${room.title} ${room.topic} ${room.host}`.toLowerCase().includes(query);
+      return matchesCategory && matchesSearch;
+    });
+  }, [activeCategory, rooms, search]);
+
+  const currentMembers = joined && !currentRoom.members.some((member) => member.name === "أنت")
+    ? [...currentRoom.members, { name: "أنت", role: "مستمع" as const, initials: "أنت", tone: "tone-coral" }]
+    : currentRoom.members;
+
+  const handleSelectRoom = (room: Room) => {
+    setCurrentRoomId(room.id);
+    setJoined(false);
+    micStream?.getTracks().forEach((track) => track.stop());
+    setMicStream(null);
+    setMicEnabled(false);
+  };
+
+  const handleJoin = () => {
+    setJoined((value) => {
+      const next = !value;
+      toast.success(next ? `انضممت إلى «${currentRoom.title}»` : "غادرت الغرفة بنجاح", {
+        description: next ? "يمكنك الآن الاستماع والتفاعل مع المتحدثين." : "نراك في غرفة أخرى قريبًا.",
+      });
+      if (!next) {
+        micStream?.getTracks().forEach((track) => track.stop());
+        setMicStream(null);
+        setMicEnabled(false);
+      }
+      return next;
+    });
+  };
+
+  const handleMicToggle = async () => {
+    if (!joined) {
+      toast.info("انضم إلى الغرفة أولًا لتشغيل الميكروفون.");
+      return;
+    }
+    if (!micEnabled && navigator.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setMicStream(stream);
+        setMicEnabled(true);
+        return;
+      } catch {
+        toast.info("يمكنك تفعيل الميكروفون عند السماح بالوصول للصوت.");
+        return;
+      }
+    }
+    micStream?.getTracks().forEach((track) => track.stop());
+    setMicStream(null);
+    setMicEnabled(false);
+  };
+
+  const handleCreateRoom = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedTitle = newRoomTitle.trim();
+    if (!trimmedTitle) {
+      toast.error("أضف اسمًا للغرفة أولًا");
+      return;
+    }
+    const id = `room-${Date.now()}`;
+    const newRoom: Room = {
+      id,
+      title: trimmedTitle,
+      topic: newRoomTopic,
+      category: "الأكثر نشاطًا",
+      listeners: 1,
+      status: "مباشر الآن",
+      accent: "coral",
+      host: "أنت",
+      hostInitials: "أنت",
+      hostTone: "tone-coral",
+      private: isPrivate,
+      members: [{ name: "أنت", role: "مضيف", initials: "أنت", tone: "tone-coral", speaking: true }],
+    };
+    setRooms((value) => [newRoom, ...value]);
+    setCurrentRoomId(id);
+    setJoined(true);
+    setIsCreateOpen(false);
+    setNewRoomTitle("");
+    setIsPrivate(false);
+    toast.success("غرفتك أصبحت مباشرة", { description: "شاركها مع أصدقائك وابدأ الحوار." });
+  };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <main>
-        {/* Example: lucide-react for icons */}
-        <Loader2 className="animate-spin" />
-        Example Page
-        {/* Example: Streamdown for markdown rendering */}
-        <Streamdown>Any **markdown** content</Streamdown>
-        <Button variant="default">Example Button</Button>
+    <div className="sawtio-app" dir="rtl">
+      <aside className={`sidebar ${isMobileNavOpen ? "mobile-open" : ""}`}>
+        <div className="sidebar-top">
+          <BrandMark />
+          <button className="sidebar-close" onClick={() => setIsMobileNavOpen(false)} type="button" aria-label="إغلاق القائمة"><X size={18} /></button>
+        </div>
+
+        <div className="sidebar-section-label">المساحة</div>
+        <nav className="main-nav" aria-label="التنقل الرئيسي">
+          <button className="nav-item active" type="button"><HomeIcon size={18} /><span>استكشف</span><i className="nav-pill">4</i></button>
+          <button className="nav-item" type="button" onClick={() => toast.info("لا توجد غرف محفوظة بعد") }><Headphones size={18} /><span>محادثاتي</span></button>
+          <button className="nav-item" type="button" onClick={() => toast.info("ستظهر الدعوات هنا عند وصولها") }><Bell size={18} /><span>دعواتي</span><i className="nav-notification">2</i></button>
+        </nav>
+
+        <div className="sidebar-section-label second-label">مساحتك</div>
+        <nav className="main-nav">
+          <button className="nav-item" type="button" onClick={() => setIsCreateOpen(true)}><Plus size={18} /><span>إنشاء غرفة</span></button>
+          <button className="nav-item" type="button" onClick={() => toast.info("إعدادات الحساب ستكون متاحة قريبًا") }><Settings size={18} /><span>الإعدادات</span></button>
+        </nav>
+
+        <div className="sidebar-spacer" />
+        <div className="sidebar-tip">
+          <div className="tip-icon"><Sparkles size={17} /></div>
+          <strong>صوتك له أثر</strong>
+          <p>ابدأ غرفة حول فكرة تستحق أن تُسمع.</p>
+          <button type="button" onClick={() => setIsCreateOpen(true)}>أنشئ غرفتك <ArrowUpLeft size={14} /></button>
+        </div>
+        <button className="profile-chip" type="button" onClick={() => toast.info("ملفك الشخصي قيد الإعداد") }>
+          <Avatar initials="لم" tone="tone-profile" size="small" />
+          <span><strong>ليان مراد</strong><small>المستمع الفضولي</small></span>
+          <MoreHorizontal size={17} />
+        </button>
+      </aside>
+
+      <main className="main-content">
+        <header className="topbar">
+          <button className="mobile-menu" type="button" onClick={() => setIsMobileNavOpen(true)} aria-label="فتح القائمة"><Menu size={20} /></button>
+          <div className="breadcrumbs"><span>الرئيسية</span><ChevronLeft size={14} /><strong>استكشف الغرف</strong></div>
+          <div className="topbar-actions">
+            <label className="search-box">
+              <Search size={17} />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث عن غرفة أو موضوع" aria-label="البحث عن غرفة" />
+              <kbd>⌘ K</kbd>
+            </label>
+            <button className="icon-button" type="button" onClick={() => toast.info("لا توجد تنبيهات جديدة") } aria-label="التنبيهات"><Bell size={18} /><i /></button>
+            <button className="user-menu" type="button" onClick={() => toast.info("ملفك الشخصي قيد الإعداد") }><Avatar initials="لم" tone="tone-profile" size="small" /><ChevronDown size={15} /></button>
+          </div>
+        </header>
+
+        <div className="mobile-brand"><BrandMark /></div>
+
+        <div className="dashboard-wrap">
+          <div className="dashboard-heading">
+            <div>
+              <div className="eyebrow"><span className="eyebrow-line" /> مساحة اليوم</div>
+              <h1>اسمع، شارك، <em>وكن حاضرًا.</em></h1>
+              <p>الغرفة المناسبة قد تبدأ بسؤال صغير.</p>
+            </div>
+            <button className="create-button" type="button" onClick={() => setIsCreateOpen(true)}><Plus size={17} /> أنشئ غرفة</button>
+          </div>
+
+          <section className="feature-room" aria-label="الغرفة المميزة">
+            <div className="feature-glow glow-one" /><div className="feature-glow glow-two" />
+            <div className="feature-copy">
+              <div className="feature-tag"><span><i /> مباشر الآن</span><small>اختيار Sawtio</small></div>
+              <h2>{currentRoom.title}</h2>
+              <p>حديث مفتوح عن التفاصيل التي تمنح مدننا روحها، بصوت أشخاص يعيشونها كل يوم.</p>
+              <div className="feature-host"><Avatar initials={currentRoom.hostInitials} tone={currentRoom.hostTone} size="normal" /><span><small>يستضيفها</small><strong>{currentRoom.host}</strong></span></div>
+              <button className="feature-cta" type="button" onClick={handleJoin}>{joined ? "أنت داخل الغرفة" : "انضم إلى الحوار"}<ArrowUpLeft size={17} /></button>
+            </div>
+            <div className="feature-visual" aria-hidden="true">
+              <div className="wave-disc"><div className="wave-ring ring-a" /><div className="wave-ring ring-b" /><div className="wave-ring ring-c" /><div className="disc-core"><Volume2 size={25} /></div></div>
+              <div className="visual-caption"><span className="pulse-bars"><i /><i /><i /><i /><i /></span><span>الصوت واضح ومفتوح</span></div>
+            </div>
+            <div className="feature-stat"><strong>{currentRoom.listeners}</strong><span>مستمعًا الآن</span><div className="avatar-stack"><Avatar initials="عخ" tone="tone-ocean" size="small" /><Avatar initials="لع" tone="tone-lilac" size="small" /><Avatar initials="من" tone="tone-mint" size="small" /><b>+124</b></div></div>
+          </section>
+
+          <div className="content-columns">
+            <section className="rooms-section">
+              <div className="section-heading"><div><div className="eyebrow compact"><span className="eyebrow-line" /> على الهواء</div><h2>غرف قد تهمك</h2></div><button className="text-button" type="button" onClick={() => { setActiveCategory("الكل"); setSearch(""); }}>عرض الكل <ArrowUpLeft size={15} /></button></div>
+              <div className="category-tabs" role="tablist" aria-label="تصنيف الغرف">{categories.map((category) => <button key={category} className={activeCategory === category ? "active" : ""} onClick={() => setActiveCategory(category)} type="button">{category}</button>)}</div>
+              <div className="rooms-list">{filteredRooms.length ? filteredRooms.map((room) => <RoomCard key={room.id} room={room} selected={currentRoomId === room.id} onSelect={() => handleSelectRoom(room)} />) : <div className="empty-state"><Search size={22} /><strong>لم نجد غرفة بهذا الاسم</strong><span>جرّب كلمة أخرى أو استكشف كل الغرف.</span></div>}</div>
+            </section>
+
+            <aside className="live-panel" aria-label="الغرفة الحالية">
+              <div className="panel-heading"><div><span className="live-kicker"><i /> غرفة حية</span><h2>داخل الغرفة</h2></div><button className="panel-more" type="button" onClick={() => toast.info("خيارات الغرفة قيد الإعداد")} aria-label="المزيد"><MoreHorizontal size={19} /></button></div>
+              <div className="current-room-mini"><div className={`mini-room-art art-${currentRoom.accent}`}><Radio size={17} /></div><div><strong>{currentRoom.title}</strong><span>{currentRoom.private ? "غرفة خاصة" : currentRoom.topic} · {currentRoom.listeners} مستمع</span></div></div>
+              <div className="members-heading"><span>المشاركون <b>{currentMembers.length}</b></span><button type="button" onClick={() => toast.info("مشاركة رابط الغرفة قيد الإعداد")}>دعوة <ArrowUpLeft size={14} /></button></div>
+              <div className="members-list">{currentMembers.map((member, index) => <div className={`member-row ${member.name === "أنت" ? "self" : ""}`} key={`${member.name}-${index}`}><Avatar initials={member.initials} tone={member.tone} speaking={member.speaking} size="normal" /><div className="member-name"><strong>{member.name}</strong><span>{member.role}</span></div>{member.speaking && <span className="speaking-wave"><i /><i /><i /></span>}{member.name === "أنت" && <span className="you-badge">أنت</span>}</div>)}</div>
+              <div className="panel-divider" />
+              <div className="audio-status"><span className="status-signal"><i /><i /><i /><i /></span><div><strong>{joined ? "أنت متصل الآن" : "استمع قبل أن تنضم"}</strong><span>{joined ? "الصوت يعمل بجودة ممتازة" : "انضم لتشارك بصوتك"}</span></div></div>
+              <div className="room-controls"><button className={`control-button mic-control ${micEnabled ? "active" : ""}`} type="button" onClick={handleMicToggle} aria-label={micEnabled ? "كتم الميكروفون" : "تشغيل الميكروفون"}>{micEnabled ? <Mic size={19} /> : <MicOff size={19} />}<span>{micEnabled ? "الميكروفون يعمل" : "الميكروفون مكتوم"}</span></button><button className="control-button sound-control" type="button" onClick={() => setSpeakerEnabled((value) => !value)} aria-label={speakerEnabled ? "كتم الصوت" : "تشغيل الصوت"}>{speakerEnabled ? <Speaker size={18} /> : <VolumeX size={18} />}<span>{speakerEnabled ? "الصوت" : "صامت"}</span></button></div>
+              <button className={`join-room-button ${joined ? "joined" : ""}`} type="button" onClick={handleJoin}>{joined ? "مغادرة الغرفة" : "انضمام إلى الغرفة"}<ChevronLeft size={17} /></button>
+              <div className="panel-note"><CircleHelp size={14} /><span>يمكنك المغادرة في أي وقت دون أن يفوتك شيء.</span></div>
+            </aside>
+          </div>
+        </div>
+
+        <footer className="page-footer"><span>© 2025 Sawtio</span><span>صُنع للحكايات التي تستحق أن تُسمع</span><span><a href="#help">مركز المساعدة</a><a href="#privacy">الخصوصية</a></span></footer>
       </main>
+
+      {isCreateOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setIsCreateOpen(false); }}><form className="create-dialog" onSubmit={handleCreateRoom}><button className="dialog-close" type="button" onClick={() => setIsCreateOpen(false)} aria-label="إغلاق"><X size={18} /></button><div className="dialog-icon"><Radio size={22} /></div><div className="eyebrow compact"><span className="eyebrow-line" /> غرفة جديدة</div><h2>ما الفكرة التي تستحق صوتًا؟</h2><p>اصنع مساحة صغيرة لحوار كبير، وابدأها بطريقتك.</p><label>اسم الغرفة<input autoFocus value={newRoomTitle} onChange={(event) => setNewRoomTitle(event.target.value)} placeholder="مثال: جلسة شاي وموسيقى" /></label><label>موضوع الغرفة<select value={newRoomTopic} onChange={(event) => setNewRoomTopic(event.target.value)}><option>مجتمع</option><option>تصميم وتقنية</option><option>كتب وثقافة</option><option>رفاهية</option><option>صباحي</option></select></label><label className="privacy-toggle"><span className="toggle-copy"><strong>غرفة خاصة</strong><small>يمكن للأشخاص المدعوين فقط الدخول</small></span><input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} /><i className="toggle-track"><b /></i><LockKeyhole size={16} /></label><button className="dialog-submit" type="submit">ابدأ الغرفة <ArrowUpLeft size={17} /></button></form></div>}
     </div>
   );
 }
