@@ -23,16 +23,12 @@ export type SupabaseMember = {
 
 export type SupabaseRoomRow = {
   id: string;
+  host_id: string | null;
   title: string;
-  topic: string;
-  category: string;
-  listeners: number;
+  description: string | null;
+  cover_color: string | null;
   status: string;
-  accent: string;
-  host: string;
-  host_initials: string;
-  host_tone: string;
-  private: boolean;
-  members: SupabaseMember[];
+  listener_count: number;
   created_at: string;
+  ended_at: string | null;
 };

@@ -53,94 +53,37 @@ type Room = {
   private?: boolean;
 };
 
-const initialRooms: Room[] = [
-  {
-    id: "pulse-cairo",
-    title: "نبض القاهرة: حكايات المدينة التي لا تنام",
-    topic: "مجتمع",
-    category: "الأكثر نشاطًا",
-    listeners: 128,
-    status: "مباشر الآن",
-    accent: "coral",
-    host: "سارة منصور",
-    hostInitials: "سم",
-    hostTone: "tone-sunset",
-    members: [
-      { name: "سارة منصور", role: "مضيف", initials: "سم", tone: "tone-sunset", speaking: true },
-      { name: "عمر خالد", role: "متحدث", initials: "عخ", tone: "tone-ocean", speaking: true },
-      { name: "ليان عبد الله", role: "متحدث", initials: "لع", tone: "tone-lilac" },
-      { name: "مازن ناصر", role: "مستمع", initials: "من", tone: "tone-mint" },
-    ],
-  },
-  {
-    id: "design-table",
-    title: "طاولة المصممين: ما بعد الذكاء الاصطناعي",
-    topic: "تصميم وتقنية",
-    category: "تقنية",
-    listeners: 84,
-    status: "مباشر الآن",
-    accent: "teal",
-    host: "يوسف قاسم",
-    hostInitials: "يق",
-    hostTone: "tone-ocean",
-    members: [
-      { name: "يوسف قاسم", role: "مضيف", initials: "يق", tone: "tone-ocean", speaking: true },
-      { name: "نور الشريف", role: "متحدث", initials: "نش", tone: "tone-lilac" },
-      { name: "هند مراد", role: "مستمع", initials: "هم", tone: "tone-rose" },
-    ],
-  },
-  {
-    id: "morning-notes",
-    title: "ملاحظات الصباح: كيف نصنع يومًا أخف؟",
-    topic: "رفاهية",
-    category: "صباحي",
-    listeners: 42,
-    status: "مباشر الآن",
-    accent: "amber",
-    host: "ريم عادل",
-    hostInitials: "رع",
-    hostTone: "tone-honey",
-    members: [
-      { name: "ريم عادل", role: "مضيف", initials: "رع", tone: "tone-honey", speaking: true },
-      { name: "إياد فهد", role: "متحدث", initials: "إف", tone: "tone-mint" },
-    ],
-  },
-  {
-    id: "book-club",
-    title: "نادي الصفحة الأخيرة: روايات تستحق الوقت",
-    topic: "كتب وثقافة",
-    category: "ثقافة",
-    listeners: 31,
-    status: "مباشر الآن",
-    accent: "violet",
-    host: "نادر شوقي",
-    hostInitials: "نش",
-    hostTone: "tone-lilac",
-    members: [
-      { name: "نادر شوقي", role: "مضيف", initials: "نش", tone: "tone-lilac" },
-      { name: "جنى فوزي", role: "متحدث", initials: "جف", tone: "tone-rose" },
-    ],
-  },
-];
-
 const categories = ["الكل", "الأكثر نشاطًا", "تقنية", "ثقافة", "صباحي"];
-const roomAccents = new Set<Room["accent"]>(["coral", "teal", "violet", "amber"]);
+const emptyRoom: Room = {
+  id: "empty",
+  title: "لا توجد غرف مباشرة بعد",
+  topic: "أنشئ أول غرفة من مساحة Sawtio",
+  category: "الأكثر نشاطًا",
+  listeners: 0,
+  status: "بانتظارك",
+  accent: "coral",
+  host: "Sawtio",
+  hostInitials: "سو",
+  hostTone: "tone-coral",
+  members: [],
+};
 
 function normalizeRoom(row: SupabaseRoomRow): Room {
-  const members = Array.isArray(row.members) ? row.members : [];
-  const accent = roomAccents.has(row.accent as Room["accent"]) ? row.accent as Room["accent"] : "coral";
+  const members: Member[] = [];
+  const color = row.cover_color?.toLowerCase() ?? "";
+  const accent: Room["accent"] = color.includes("teal") || color.includes("green") ? "teal" : color.includes("violet") || color.includes("purple") ? "violet" : color.includes("amber") || color.includes("yellow") ? "amber" : "coral";
   return {
     id: row.id,
     title: row.title,
-    topic: row.topic,
-    category: row.category,
-    listeners: row.listeners,
-    status: row.status,
+    topic: row.description || "مجتمع",
+    category: "الأكثر نشاطًا",
+    listeners: row.listener_count ?? 0,
+    status: row.status === "live" || row.status === "active" ? "مباشر الآن" : row.status,
     accent,
-    host: row.host,
-    hostInitials: row.host_initials,
-    hostTone: row.host_tone,
-    private: row.private,
+    host: row.host_id ? "مضيف Sawtio" : "فريق Sawtio",
+    hostInitials: "سو",
+    hostTone: "tone-coral",
+    private: false,
     members,
   };
 }
@@ -198,8 +141,8 @@ function RoomCard({ room, selected, onSelect }: { room: Room; selected: boolean;
 
 export default function Home() {
   const { user, loading: authLoading } = useSupabaseAuth();
-  const [rooms, setRooms] = useState<Room[]>(initialRooms);
-  const [currentRoomId, setCurrentRoomId] = useState("pulse-cairo");
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [currentRoomId, setCurrentRoomId] = useState("");
   const [activeCategory, setActiveCategory] = useState("الكل");
   const [search, setSearch] = useState("");
   const [joined, setJoined] = useState(false);
@@ -216,7 +159,7 @@ export default function Home() {
   const [activeView, setActiveView] = useState<"rooms" | "messages">("rooms");
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-  const currentRoom = rooms.find((room) => room.id === currentRoomId) ?? rooms[0];
+  const currentRoom = rooms.find((room) => room.id === currentRoomId) ?? emptyRoom;
   const userName = user?.user_metadata?.display_name || user?.email?.split("@")[0] || (authLoading ? "جارٍ التحقق" : "زائر");
   const userInitials = userName.slice(0, 2);
 
@@ -241,11 +184,9 @@ export default function Home() {
         setDatabaseState("fallback");
         return;
       }
-      if (data?.length) {
-        const loadedRooms = data.map((row) => normalizeRoom(row as SupabaseRoomRow));
-        setRooms(loadedRooms);
-        setCurrentRoomId(loadedRooms[0].id);
-      }
+      const loadedRooms = (data ?? []).map((row) => normalizeRoom(row as SupabaseRoomRow));
+      setRooms(loadedRooms);
+      setCurrentRoomId(loadedRooms[0]?.id ?? "");
       setDatabaseState("connected");
     };
 
@@ -284,6 +225,10 @@ export default function Home() {
   };
 
   const handleJoin = () => {
+    if (currentRoom.id === emptyRoom.id) {
+      toast.info("أنشئ أول غرفة لتبدأ البث الصوتي.");
+      return;
+    }
     setJoined((value) => {
       const next = !value;
       toast.success(next ? `انضممت إلى «${currentRoom.title}»` : "غادرت الغرفة بنجاح", {
@@ -353,18 +298,12 @@ export default function Home() {
         const { data, error } = await supabase
           .from("rooms")
           .insert({
-            host_user_id: user.id,
+            host_id: user.id,
             title: draftRoom.title,
-            topic: draftRoom.topic,
-            category: draftRoom.category,
-            listeners: draftRoom.listeners,
-            status: draftRoom.status,
-            accent: draftRoom.accent,
-            host: draftRoom.host,
-            host_initials: draftRoom.hostInitials,
-            host_tone: draftRoom.hostTone,
-            private: draftRoom.private,
-            members: draftRoom.members,
+            description: draftRoom.topic,
+            cover_color: "#ff8f7f",
+            status: "live",
+            listener_count: 1,
           })
           .select()
           .single();

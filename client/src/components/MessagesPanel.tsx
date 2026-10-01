@@ -66,17 +66,17 @@ export default function MessagesPanel({ user, onRequestAuth }: MessagesPanelProp
     const openThread = async () => {
       setLoadingThread(true);
       setMessages([]);
-      const { data: mine } = await client.from("conversation_members").select("conversation_id").eq("user_id", user.id);
+      const { data: mine } = await client.from("direct_conversation_members").select("conversation_id").eq("user_id", user.id);
       const ids = (mine ?? []).map((row) => row.conversation_id as string);
       let existingId: string | null = null;
       if (ids.length) {
-        const { data: theirs } = await client.from("conversation_members").select("conversation_id").eq("user_id", selectedProfile.id).in("conversation_id", ids).limit(1);
+        const { data: theirs } = await client.from("direct_conversation_members").select("conversation_id").eq("user_id", selectedProfile.id).in("conversation_id", ids).limit(1);
         existingId = theirs?.[0]?.conversation_id ?? null;
       }
       if (cancelled) return;
       setConversationId(existingId);
       if (existingId) {
-        const { data, error } = await client.from("messages").select("id, conversation_id, sender_id, body, created_at").eq("conversation_id", existingId).order("created_at", { ascending: true });
+        const { data, error } = await client.from("direct_messages").select("id, conversation_id, sender_id, body, created_at").eq("conversation_id", existingId).order("created_at", { ascending: true });
         if (!error) setMessages((data ?? []) as Message[]);
       }
       setLoadingThread(false);
@@ -88,7 +88,7 @@ export default function MessagesPanel({ user, onRequestAuth }: MessagesPanelProp
   useEffect(() => {
     const client = supabase;
     if (!client || !conversationId) return;
-    const channel = client.channel(`messages:${conversationId}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` }, (payload) => {
+    const channel = client.channel(`direct_messages:${conversationId}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "direct_messages", filter: `conversation_id=eq.${conversationId}` }, (payload) => {
       const incoming = payload.new as Message;
       setMessages((current) => current.some((message) => message.id === incoming.id) ? current : [...current, incoming]);
     }).subscribe();
@@ -98,12 +98,12 @@ export default function MessagesPanel({ user, onRequestAuth }: MessagesPanelProp
   const createConversation = async () => {
     const client = supabase;
     if (!client || !user || !selectedProfile) return null;
-    const { data: conversation, error: conversationError } = await client.from("conversations").insert({}).select("id").single();
+    const { data: conversation, error: conversationError } = await client.from("direct_conversations").insert({}).select("id").single();
     if (conversationError || !conversation) {
       toast.error("تعذر إنشاء المحادثة", { description: conversationError?.message });
       return null;
     }
-    const { error: membersError } = await client.from("conversation_members").insert([
+    const { error: membersError } = await client.from("direct_conversation_members").insert([
       { conversation_id: conversation.id, user_id: user.id },
       { conversation_id: conversation.id, user_id: selectedProfile.id },
     ]);
@@ -124,7 +124,7 @@ export default function MessagesPanel({ user, onRequestAuth }: MessagesPanelProp
     let targetConversation = conversationId;
     if (!targetConversation) targetConversation = await createConversation();
     if (!targetConversation) { setSending(false); return; }
-    const { data, error } = await client.from("messages").insert({ conversation_id: targetConversation, sender_id: user.id, body }).select("id, conversation_id, sender_id, body, created_at").single();
+    const { data, error } = await client.from("direct_messages").insert({ conversation_id: targetConversation, sender_id: user.id, body }).select("id, conversation_id, sender_id, body, created_at").single();
     setSending(false);
     if (error) {
       toast.error("تعذر إرسال الرسالة", { description: error.message });
