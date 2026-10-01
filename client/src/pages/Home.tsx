@@ -75,7 +75,7 @@ function normalizeRoom(row: SupabaseRoomRow): Room {
   return {
     id: row.id,
     title: row.title,
-    topic: row.description || "مجتمع",
+    topic: row.topic || "مجتمع",
     category: "الأكثر نشاطًا",
     listeners: row.listener_count ?? 0,
     status: row.status === "live" || row.status === "active" ? "مباشر الآن" : row.status,
@@ -299,11 +299,15 @@ export default function Home() {
           .from("rooms")
           .insert({
             host_id: user.id,
+            slug: `${draftRoom.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "sawtio-room"}-${Date.now()}`,
             title: draftRoom.title,
-            description: draftRoom.topic,
+            topic: draftRoom.topic,
+            description: "",
             cover_color: "#ff8f7f",
             status: "live",
             listener_count: 1,
+            max_speakers: 10,
+            tags: [draftRoom.topic],
           })
           .select()
           .single();

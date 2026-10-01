@@ -123,3 +123,57 @@ begin
   alter publication supabase_realtime add table public.direct_messages;
 exception when duplicate_object then null;
 end $$;
+
+-- 5) Admin-only monitoring policies.
+-- The existing profiles table already contains a role column.
+create or replace function public.is_admin(target_user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = target_user_id and role = 'admin'
+  );
+$$;
+
+revoke all on function public.is_admin(uuid) from public;
+grant execute on function public.is_admin(uuid) to authenticated;
+
+drop policy if exists "admins can read all profiles" on public.profiles;
+create policy "admins can read all profiles"
+on public.profiles for select
+to authenticated
+using (id = auth.uid() or public.is_admin(auth.uid()));
+
+drop policy if exists "admins can read all rooms" on public.rooms;
+create policy "admins can read all rooms"
+on public.rooms for select
+to authenticated
+using (public.is_admin(auth.uid()));
+
+drop policy if exists "admins can read all room messages" on public.room_messages;
+create policy "admins can read all room messages"
+on public.room_messages for select
+to authenticated
+using (public.is_admin(auth.uid()));
+
+drop policy if exists "admins can read all direct conversations" on public.direct_conversations;
+create policy "admins can read all direct conversations"
+on public.direct_conversations for select
+to authenticated
+using (public.is_admin(auth.uid()));
+
+drop policy if exists "admins can read all direct membership" on public.direct_conversation_members;
+create policy "admins can read all direct membership"
+on public.direct_conversation_members for select
+to authenticated
+using (public.is_admin(auth.uid()));
+
+drop policy if exists "admins can read all direct messages" on public.direct_messages;
+create policy "admins can read all direct messages"
+on public.direct_messages for select
+to authenticated
+using (public.is_admin(auth.uid()));
