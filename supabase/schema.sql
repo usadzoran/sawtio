@@ -18,6 +18,18 @@ create table if not exists public.rooms (
   created_at timestamptz not null default now()
 );
 alter table public.rooms add column if not exists host_user_id uuid references auth.users(id) on delete set null;
+alter table public.rooms add column if not exists title text;
+alter table public.rooms add column if not exists topic text default 'مجتمع';
+alter table public.rooms add column if not exists category text default 'الأكثر نشاطًا';
+alter table public.rooms add column if not exists listeners integer default 1;
+alter table public.rooms add column if not exists status text default 'مباشر الآن';
+alter table public.rooms add column if not exists accent text default 'coral';
+alter table public.rooms add column if not exists host text;
+alter table public.rooms add column if not exists host_initials text;
+alter table public.rooms add column if not exists host_tone text default 'tone-coral';
+alter table public.rooms add column if not exists private boolean default false;
+alter table public.rooms add column if not exists members jsonb default '[]'::jsonb;
+alter table public.rooms add column if not exists created_at timestamptz default now();
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
