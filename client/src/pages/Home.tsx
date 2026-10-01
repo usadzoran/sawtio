@@ -1,5 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase, type SupabaseRoomRow } from "@/lib/supabase";
+import AuthDialog from "@/components/AuthDialog";
+import MessagesPanel from "@/components/MessagesPanel";
+import { useSupabaseAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import {
   ArrowUpLeft,
@@ -194,6 +197,7 @@ function RoomCard({ room, selected, onSelect }: { room: Room; selected: boolean;
 }
 
 export default function Home() {
+  const { user, loading: authLoading } = useSupabaseAuth();
   const [rooms, setRooms] = useState<Room[]>(initialRooms);
   const [currentRoomId, setCurrentRoomId] = useState("pulse-cairo");
   const [activeCategory, setActiveCategory] = useState("الكل");
@@ -209,8 +213,12 @@ export default function Home() {
   const [newRoomTitle, setNewRoomTitle] = useState("");
   const [newRoomTopic, setNewRoomTopic] = useState("مجتمع");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [activeView, setActiveView] = useState<"rooms" | "messages">("rooms");
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
 
   const currentRoom = rooms.find((room) => room.id === currentRoomId) ?? rooms[0];
+  const userName = user?.user_metadata?.display_name || user?.email?.split("@")[0] || (authLoading ? "جارٍ التحقق" : "زائر");
+  const userInitials = userName.slice(0, 2);
 
   useEffect(() => {
     const client = supabase;
@@ -242,8 +250,15 @@ export default function Home() {
     };
 
     void loadRooms();
+    const channel = client
+      .channel("sawtio:rooms")
+      .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, () => {
+        void loadRooms();
+      })
+      .subscribe();
     return () => {
       cancelled = true;
+      void client.removeChannel(channel);
     };
   }, []);
 
@@ -306,6 +321,12 @@ export default function Home() {
 
   const handleCreateRoom = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!user) {
+      setIsCreateOpen(false);
+      setIsAuthOpen(true);
+      toast.info("سجّل الدخول أولًا لإنشاء غرفة محفوظة باسمك.");
+      return;
+    }
     const trimmedTitle = newRoomTitle.trim();
     if (!trimmedTitle) {
       toast.error("أضف اسمًا للغرفة أولًا");
@@ -332,6 +353,7 @@ export default function Home() {
         const { data, error } = await supabase
           .from("rooms")
           .insert({
+            host_user_id: user.id,
             title: draftRoom.title,
             topic: draftRoom.topic,
             category: draftRoom.category,
@@ -369,6 +391,17 @@ export default function Home() {
     }
   };
 
+  const handleProfileClick = async () => {
+    if (!user) {
+      setIsAuthOpen(true);
+      return;
+    }
+    if (supabase) {
+      await supabase.auth.signOut();
+      toast.success("تم تسجيل الخروج");
+    }
+  };
+
   return (
     <div className="sawtio-app" dir="rtl">
       <aside className={`sidebar ${isMobileNavOpen ? "mobile-open" : ""}`}>
@@ -379,8 +412,8 @@ export default function Home() {
 
         <div className="sidebar-section-label">المساحة</div>
         <nav className="main-nav" aria-label="التنقل الرئيسي">
-          <button className="nav-item active" type="button"><HomeIcon size={18} /><span>استكشف</span><i className="nav-pill">4</i></button>
-          <button className="nav-item" type="button" onClick={() => toast.info("لا توجد غرف محفوظة بعد") }><Headphones size={18} /><span>محادثاتي</span></button>
+          <button className={`nav-item ${activeView === "rooms" ? "active" : ""}`} type="button" onClick={() => setActiveView("rooms")}><HomeIcon size={18} /><span>استكشف</span><i className="nav-pill">4</i></button>
+          <button className={`nav-item ${activeView === "messages" ? "active" : ""}`} type="button" onClick={() => setActiveView("messages")}><Headphones size={18} /><span>محادثاتي</span></button>
           <button className="nav-item" type="button" onClick={() => toast.info("ستظهر الدعوات هنا عند وصولها") }><Bell size={18} /><span>دعواتي</span><i className="nav-notification">2</i></button>
         </nav>
 
@@ -397,9 +430,9 @@ export default function Home() {
           <p>ابدأ غرفة حول فكرة تستحق أن تُسمع.</p>
           <button type="button" onClick={() => setIsCreateOpen(true)}>أنشئ غرفتك <ArrowUpLeft size={14} /></button>
         </div>
-        <button className="profile-chip" type="button" onClick={() => toast.info("ملفك الشخصي قيد الإعداد") }>
-          <Avatar initials="لم" tone="tone-profile" size="small" />
-          <span><strong>ليان مراد</strong><small>المستمع الفضولي</small></span>
+        <button className="profile-chip" type="button" onClick={handleProfileClick}>
+          <Avatar initials={userInitials} tone="tone-profile" size="small" />
+          <span><strong>{userName}</strong><small>{user ? "حساب Supabase" : "سجّل الدخول للمحادثات"}</small></span>
           <MoreHorizontal size={17} />
         </button>
       </aside>
@@ -407,7 +440,7 @@ export default function Home() {
       <main className="main-content">
         <header className="topbar">
           <button className="mobile-menu" type="button" onClick={() => setIsMobileNavOpen(true)} aria-label="فتح القائمة"><Menu size={20} /></button>
-          <div className="breadcrumbs"><span>الرئيسية</span><ChevronLeft size={14} /><strong>استكشف الغرف</strong></div>
+          <div className="breadcrumbs"><span>الرئيسية</span><ChevronLeft size={14} /><strong>{activeView === "messages" ? "الرسائل الخاصة" : "استكشف الغرف"}</strong></div>
           <div className="topbar-actions">
             <label className="search-box">
               <Search size={17} />
@@ -415,13 +448,14 @@ export default function Home() {
               <kbd>⌘ K</kbd>
             </label>
             <button className="icon-button" type="button" onClick={() => toast.info("لا توجد تنبيهات جديدة") } aria-label="التنبيهات"><Bell size={18} /><i /></button>
-            <button className="user-menu" type="button" onClick={() => toast.info("ملفك الشخصي قيد الإعداد") }><Avatar initials="لم" tone="tone-profile" size="small" /><ChevronDown size={15} /></button>
+            <button className="user-menu" type="button" onClick={handleProfileClick}><Avatar initials={userInitials} tone="tone-profile" size="small" /><ChevronDown size={15} /></button>
           </div>
         </header>
 
         <div className="mobile-brand"><BrandMark /></div>
 
         <div className="dashboard-wrap">
+          <div className={`rooms-view ${activeView === "messages" ? "view-hidden" : ""}`}>
           <div className="dashboard-heading">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> مساحة اليوم</div>
@@ -466,12 +500,15 @@ export default function Home() {
               <div className="panel-note"><CircleHelp size={14} /><span>يمكنك المغادرة في أي وقت دون أن يفوتك شيء.</span></div>
             </aside>
           </div>
+          </div>
+          <MessagesPanel user={user} onRequestAuth={() => setIsAuthOpen(true)} />
         </div>
 
         <footer className="page-footer"><span>© 2025 Sawtio</span><span>صُنع للحكايات التي تستحق أن تُسمع</span><span><a href="#help">مركز المساعدة</a><a href="#privacy">الخصوصية</a></span></footer>
       </main>
 
       {isCreateOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setIsCreateOpen(false); }}><form className="create-dialog" onSubmit={handleCreateRoom}><button className="dialog-close" type="button" onClick={() => setIsCreateOpen(false)} aria-label="إغلاق"><X size={18} /></button><div className="dialog-icon"><Radio size={22} /></div><div className="eyebrow compact"><span className="eyebrow-line" /> غرفة جديدة</div><h2>ما الفكرة التي تستحق صوتًا؟</h2><p>اصنع مساحة صغيرة لحوار كبير، وابدأها بطريقتك.</p><label>اسم الغرفة<input autoFocus value={newRoomTitle} onChange={(event) => setNewRoomTitle(event.target.value)} placeholder="مثال: جلسة شاي وموسيقى" /></label><label>موضوع الغرفة<select value={newRoomTopic} onChange={(event) => setNewRoomTopic(event.target.value)}><option>مجتمع</option><option>تصميم وتقنية</option><option>كتب وثقافة</option><option>رفاهية</option><option>صباحي</option></select></label><label className="privacy-toggle"><span className="toggle-copy"><strong>غرفة خاصة</strong><small>يمكن للأشخاص المدعوين فقط الدخول</small></span><input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} /><i className="toggle-track"><b /></i><LockKeyhole size={16} /></label><button className="dialog-submit" type="submit" disabled={isSavingRoom}>{isSavingRoom ? "جارٍ حفظ الغرفة…" : <>ابدأ الغرفة <ArrowUpLeft size={17} /></>}</button></form></div>}
+      <AuthDialog open={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </div>
   );
 }
