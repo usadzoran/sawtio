@@ -85,7 +85,7 @@ export default function AuthGate({ onSuccess }: AuthGateProps) {
     }
 
     toast.success(`أهلاً بك يا ${displayName} في Sawtio!`, {
-      description: "تم إنشاء حسابك الحقيقي عبر Supabase.",
+      description: "تم إنشاء حسابك الحقيقي عبر .",
     });
     onSuccess?.();
   };
@@ -488,7 +488,7 @@ export default function AuthGate({ onSuccess }: AuthGateProps) {
                 }}
               >
                 <Gift size={15} style={{ flexShrink: 0 }} />
-                <span>حساب حقيقي ورسائل وغرف محفوظة في قاعدة البيانات.</span>
+                <span>حساب حقيقي ورسائل وغرف متزامنة عبر أجهزتك.</span>
               </div>
 
               <button

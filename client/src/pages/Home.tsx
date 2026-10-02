@@ -4,7 +4,6 @@ import { supabase, type SupabaseRoomRow } from "@/lib/supabase";
 import AuthGate from "@/components/AuthGate";
 import AuthDialog from "@/components/AuthDialog";
 import MessagesPanel from "@/components/MessagesPanel";
-import SupabaseConnectDialog from "@/components/SupabaseConnectDialog";
 import GiftsStoreDialog from "@/components/GiftsStoreDialog";
 import LiveGiftAnimationOverlay from "@/components/LiveGiftAnimationOverlay";
 import { getUserCoins } from "@/lib/gifts";
@@ -17,7 +16,6 @@ import {
   ChevronLeft,
   CircleHelp,
   Coins,
-  Database,
   Gift,
   Headphones,
   Home as HomeIcon,
@@ -248,26 +246,19 @@ export default function Home() {
   const [isPrivate, setIsPrivate] = useState(false);
   const [activeView, setActiveView] = useState<"rooms" | "messages">("rooms");
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [isDbConnectOpen, setIsDbConnectOpen] = useState(false);
   const [dbVersion, setDbVersion] = useState(0);
   const [isGiftsStoreOpen, setIsGiftsStoreOpen] = useState(false);
   const [giftRecipient, setGiftRecipient] = useState<string>("");
   const [userCoins, setUserCoins] = useState<number>(getUserCoins);
 
   useEffect(() => {
-    const handleDbChange = () => {
-      setDbVersion((v) => v + 1);
-      setDatabaseState(supabase ? "loading" : "fallback");
-    };
     const handleCoinsChange = (e: Event) => {
       const customEvent = e as CustomEvent<{ balance: number }>;
       setUserCoins(customEvent.detail?.balance ?? getUserCoins());
     };
 
-    window.addEventListener("sawtio_supabase_change", handleDbChange);
     window.addEventListener("sawtio_coins_change", handleCoinsChange);
     return () => {
-      window.removeEventListener("sawtio_supabase_change", handleDbChange);
       window.removeEventListener("sawtio_coins_change", handleCoinsChange);
     };
   }, []);
@@ -371,8 +362,8 @@ export default function Home() {
       return;
     }
     if (!supabase || !user || user.app_metadata?.is_guest) {
-      toast.error("يجب ربط Supabase وتسجيل الدخول أولًا", {
-        description: "لا يتم حفظ الغرف في المتصفح؛ كل غرفة تُحفظ في قاعدة البيانات الحقيقية.",
+      toast.error("يجب تسجيل الدخول أولًا", {
+        description: "سيتم حفظ الغرفة تلقائيًا في حسابك.",
       });
       return;
     }
@@ -481,7 +472,6 @@ export default function Home() {
 
         <div className="sidebar-section-label second-label">مساحتك</div>
         <nav className="main-nav">
-          <button className="nav-item" type="button" onClick={() => setIsDbConnectOpen(true)}><Database size={18} /><span>قاعدة البيانات</span></button>
           <button className="nav-item" type="button" onClick={() => setIsCreateOpen(true)}><Plus size={18} /><span>إنشاء غرفة</span></button>
           <button className="nav-item" type="button" onClick={() => toast.info("إعدادات الحساب ستكون متاحة قريبًا") }><Settings size={18} /><span>الإعدادات</span></button>
         </nav>
@@ -550,15 +540,6 @@ export default function Home() {
               <p>الغرفة المناسبة قد تبدأ بسؤال صغير.</p>
             </div>
             <div className="heading-actions">
-              <button
-                type="button"
-                className={`database-badge ${databaseState}`}
-                onClick={() => setIsDbConnectOpen(true)}
-                title="إعدادات واتصال Supabase"
-                style={{ cursor: "pointer", border: "1px solid", fontFamily: "inherit" }}
-              >
-                <span /> {databaseState === "loading" ? "جاري الاتصال" : databaseState === "connected" ? "Supabase متصلة" : "قاعدة البيانات غير متصلة · اضغط للربط"}
-              </button>
               <button className="create-button" type="button" onClick={() => setIsCreateOpen(true)}><Plus size={17} /> أنشئ غرفة</button>
             </div>
           </div>
@@ -586,77 +567,15 @@ export default function Home() {
               <div className="rooms-list">{filteredRooms.length ? filteredRooms.map((room) => <RoomCard key={room.id} room={room} selected={currentRoomId === room.id} onSelect={() => handleSelectRoom(room)} />) : <div className="empty-state"><Search size={22} /><strong>لم نجد غرفة بهذا الاسم</strong><span>جرّب كلمة أخرى أو استكشف كل الغرف.</span></div>}</div>
             </section>
 
-            <aside className="live-panel" aria-label="الغرفة الحالية">
-              <div className="panel-heading"><div><span className="live-kicker"><i /> غرفة حية</span><h2>داخل الغرفة</h2></div><button className="panel-more" type="button" onClick={() => toast.info("خيارات الغرفة قيد الإعداد")} aria-label="المزيد"><MoreHorizontal size={19} /></button></div>
-              <div className="current-room-mini"><div className={`mini-room-art art-${currentRoom.accent}`}><Radio size={17} /></div><div><strong>{currentRoom.title}</strong><span>{currentRoom.private ? "غرفة خاصة" : currentRoom.topic} · {currentRoom.listeners} مستمع</span></div></div>
-              <div className="members-heading"><span>المشاركون <b>{currentMembers.length}</b></span><button type="button" onClick={() => toast.info("مشاركة رابط الغرفة قيد الإعداد")}>دعوة <ArrowUpLeft size={14} /></button></div>
-              <div className="members-list">
-                {currentMembers.map((member, index) => (
-                  <div className={`member-row ${member.name === (userName || "أنت") ? "self" : ""}`} key={`${member.name}-${index}`}>
-                    <Avatar initials={member.initials} tone={member.tone} speaking={member.speaking} size="normal" />
-                    <div className="member-name">
-                      <strong>{member.name}</strong>
-                      <span>{member.role}</span>
-                    </div>
-                    {member.speaking && <span className="speaking-wave"><i /><i /><i /></span>}
-                    {member.name === (userName || "أنت") ? (
-                      <span className="you-badge">أنت</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGiftRecipient(member.name);
-                          setIsGiftsStoreOpen(true);
-                        }}
-                        style={{
-                          background: "#fff1ee",
-                          border: "1px solid #ffd4cd",
-                          color: "#d96051",
-                          borderRadius: "6px",
-                          padding: "2px 7px",
-                          fontSize: "10px",
-                          fontWeight: 600,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "3px",
-                          cursor: "pointer",
-                          marginRight: "auto",
-                        }}
-                        title={`إرسال هدية إلى ${member.name}`}
-                      >
-                        <Gift size={11} /> <span>إهداء</span>
-                      </button>
-                    )}
-                  </div>
-                ))}
+            <aside className="room-page-callout" aria-label="فتح الغرفة">
+              <div className="room-page-callout-icon"><Radio size={22} /></div>
+              <div>
+                <strong>الغرف الصوتية تفتح في صفحة مستقلة</strong>
+                <span>اختر أي غرفة لفتح الميكروفون والدردشة والمشاركين في مساحة مخصصة.</span>
               </div>
-              <div className="panel-divider" />
-              <div className="audio-status"><span className="status-signal"><i /><i /><i /><i /></span><div><strong>{joined ? "أنت متصل الآن" : "استمع قبل أن تنضم"}</strong><span>{joined ? "الصوت يعمل بجودة ممتازة" : "انضم لتشارك بصوتك"}</span></div></div>
-              <div className="room-controls">
-                <button className={`control-button mic-control ${micEnabled ? "active" : ""}`} type="button" onClick={handleMicToggle} aria-label={micEnabled ? "كتم الميكروفون" : "تشغيل الميكروفون"}>{micEnabled ? <Mic size={19} /> : <MicOff size={19} />}<span>{micEnabled ? "الميكروفون يعمل" : "الميكروفون مكتوم"}</span></button>
-                <button className="control-button sound-control" type="button" onClick={() => setSpeakerEnabled((value) => !value)} aria-label={speakerEnabled ? "كتم الصوت" : "تشغيل الصوت"}>{speakerEnabled ? <Speaker size={18} /> : <VolumeX size={18} />}<span>{speakerEnabled ? "الصوت" : "صامت"}</span></button>
-                <button
-                  className="control-button gift-control"
-                  type="button"
-                  onClick={() => {
-                    setGiftRecipient(currentRoom.host || "المضيف");
-                    setIsGiftsStoreOpen(true);
-                  }}
-                  style={{
-                    background: "linear-gradient(135deg, #fff1ee, #ffe8e3)",
-                    color: "#d96051",
-                    border: "1px solid #ffc9be",
-                    cursor: "pointer",
-                  }}
-                  aria-label="إرسال هدية في الغرفة"
-                  title="متجر الهدايا وإرسال هدية"
-                >
-                  <Gift size={18} />
-                  <span>إهداء</span>
-                </button>
-              </div>
-              <button className={`join-room-button ${joined ? "joined" : ""}`} type="button" onClick={handleJoin}>{joined ? "مغادرة الغرفة" : "انضمام إلى الغرفة"}<ChevronLeft size={17} /></button>
-              <div className="panel-note"><CircleHelp size={14} /><span>يمكنك المغادرة في أي وقت دون أن يفوتك شيء.</span></div>
+              <button type="button" className="join-room-button" onClick={handleJoin} disabled={currentRoom.id === emptyRoom.id}>
+                فتح الغرفة <ArrowUpLeft size={17} />
+              </button>
             </aside>
           </div>
           </div>
@@ -668,7 +587,6 @@ export default function Home() {
 
       {isCreateOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setIsCreateOpen(false); }}><form className="create-dialog" onSubmit={handleCreateRoom}><button className="dialog-close" type="button" onClick={() => setIsCreateOpen(false)} aria-label="إغلاق"><X size={18} /></button><div className="dialog-icon"><Radio size={22} /></div><div className="eyebrow compact"><span className="eyebrow-line" /> غرفة جديدة</div><h2>ما الفكرة التي تستحق صوتًا؟</h2><p>اصنع مساحة صغيرة لحوار كبير، وابدأها بطريقتك.</p><label>اسم الغرفة<input autoFocus value={newRoomTitle} onChange={(event) => setNewRoomTitle(event.target.value)} placeholder="مثال: جلسة شاي وموسيقى" /></label><label>موضوع الغرفة<select value={newRoomTopic} onChange={(event) => setNewRoomTopic(event.target.value)}><option>مجتمع</option><option>تصميم وتقنية</option><option>كتب وثقافة</option><option>رفاهية</option><option>صباحي</option></select></label><label className="privacy-toggle"><span className="toggle-copy"><strong>غرفة خاصة</strong><small>يمكن للأشخاص المدعوين فقط الدخول</small></span><input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} /><i className="toggle-track"><b /></i><LockKeyhole size={16} /></label><button className="dialog-submit" type="submit" disabled={isSavingRoom}>{isSavingRoom ? "جارٍ حفظ الغرفة…" : <>ابدأ الغرفة <ArrowUpLeft size={17} /></>}</button></form></div>}
       <AuthDialog open={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
-      <SupabaseConnectDialog open={isDbConnectOpen} onClose={() => setIsDbConnectOpen(false)} />
       <GiftsStoreDialog
         open={isGiftsStoreOpen}
         onClose={() => setIsGiftsStoreOpen(false)}

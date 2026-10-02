@@ -323,7 +323,7 @@ export default function RoomPage() {
     e.preventDefault();
     if (!chatInput.trim()) return;
     if (!supabase || !user) {
-      toast.error("تسجيل الدخول وقاعدة البيانات مطلوبان لإرسال الرسائل");
+      toast.error("تسجيل الدخول مطلوب لإرسال الرسائل");
       return;
     }
     const body = chatInput.trim();

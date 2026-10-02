@@ -25,7 +25,7 @@ export default function AuthDialog({ open, onClose }: AuthDialogProps) {
       return;
     }
     if (!supabase) {
-      toast.error("تعذر الاتصال بقاعدة البيانات", { description: "أعد تحميل الموقع وحاول مرة أخرى." });
+      toast.error("تعذر الاتصال بالخدمة", { description: "أعد تحميل الموقع وحاول مرة أخرى." });
       return;
     }
 
@@ -75,7 +75,7 @@ export default function AuthDialog({ open, onClose }: AuthDialogProps) {
           <>
             <h2 id="auth-title">ادخل إلى مساحتك.</h2>
             <p>
-              سجّل بريدك لتصلك روابط الدخول الآمنة وتحفظ غرفك في قاعدة البيانات.
+              سجّل بريدك لتصلك روابط الدخول الآمنة وتحفظ غرفك في الخدمة.
             </p>
             <form onSubmit={handleSubmit}>
               <label className="auth-label">
