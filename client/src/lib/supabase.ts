@@ -3,6 +3,12 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 const STORAGE_URL_KEY = "sawtio_supabase_url";
 const STORAGE_KEY_KEY = "sawtio_supabase_anon_key";
 
+// Supabase publishable credentials are designed to be used in browser builds.
+// They keep the GitHub Pages build connected even when repository Actions
+// secrets are unavailable; database access remains protected by RLS policies.
+const PUBLIC_SUPABASE_URL = "https://dkljmspbkxkiodgdxqhc.supabase.co";
+const PUBLIC_SUPABASE_KEY = "sb_publishable_eMrZxHK5TgERi_feIX29Dg_hzODLThO";
+
 export function getSupabaseCredentials(): { url: string; anonKey: string; isCustom: boolean } {
   const envUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
   const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
@@ -22,7 +28,7 @@ export function getSupabaseCredentials(): { url: string; anonKey: string; isCust
     return { url: envUrl, anonKey: envKey, isCustom: false };
   }
 
-  return { url: "", anonKey: "", isCustom: false };
+  return { url: PUBLIC_SUPABASE_URL, anonKey: PUBLIC_SUPABASE_KEY, isCustom: false };
 }
 
 function createSupabaseClient(url: string, key: string): SupabaseClient | null {
@@ -116,8 +122,8 @@ export function disconnectSupabase(): void {
     localStorage.removeItem(STORAGE_KEY_KEY);
   } catch {}
 
-  const envUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() || "";
-  const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim() || "";
+  const envUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() || PUBLIC_SUPABASE_URL;
+  const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim() || PUBLIC_SUPABASE_KEY;
   supabase = createSupabaseClient(envUrl, envKey);
   window.dispatchEvent(new CustomEvent("sawtio_supabase_change"));
 }
