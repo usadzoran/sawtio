@@ -1,29 +1,39 @@
-# تشغيل Sawtio على GitHub Pages
+# حل مشكلة ظهور نص README على GitHub Pages وتشغيل Sawtio
 
-تم تجهيز نسخة Static من تطبيق React في جذر المستودع حتى تعمل مع إعداد GitHub Pages الحالي:
+إذا ظهر لك موقع GitHub Pages كما في الصورة (يعرض نص ملف README ومحتويات تقنية بدلاً من واجهة التطبيق)، فالسبب هو أن **إعدادات GitHub Pages في مستودعك مضبوطة افتراضيًا على قراءة الفرع بدون تشغيل بناء Vite**.
 
-- **Source:** `main`
-- **Folder:** `/ (root)`
-- **URL:** https://usadzoran.github.io/sawtio/
+---
 
-التوجيه الداخلي يستخدم Hash URLs، لذلك لوحة الإدارة تفتح عبر:
+## ⚡ الحل الأسرع بنقرة واحدة (موصى به 100%):
 
-https://usadzoran.github.io/sawtio/#/admin
+1. ادخل إلى مستودعك على GitHub: `https://github.com/usadzoran/sawtio`
+2. اضغط على **Settings** (الإعدادات) في أعلى المستودع.
+3. من القائمة الجانبية اليسرى، اضغط على **Pages**.
+4. تحت قسم **Build and deployment**:
+   - ستجد قائمة **Source**: غيّرها من `Deploy from a branch` إلى **`GitHub Actions`**.
+5. اذهب إلى تبويب **Actions** في الأعلى:
+   - ستجد سير العمل **Deploy Sawtio to GitHub Pages** يعمل تلقائيًا.
+   - خلال دقيقة واحدة، سيتحول إلى علامة صح خضراء ✅ ويصبح موقعك منشورًا وشغالاً بالكامل!
 
-## تحديث النسخة المنشورة
+---
 
-بعد تعديل الواجهة شغّل:
+## 🛠️ الحل البديل (إذا كنت تفضل خيار Deploy from a branch):
 
-```bash
-GITHUB_PAGES=true pnpm build:static
-rm -rf assets api __manus__
-cp -r dist/public/assets assets
-cp -r dist/public/api api
-cp -r dist/public/__manus__ __manus__
-cp dist/public/index.html index.html
-cp dist/public/manus-routes.json manus-routes.json
-touch .nojekyll
-git add . && git commit -m "Update GitHub Pages build" && git push origin main
-```
+لقد قمنا بتجهيز مجلد `docs/` بالكامل بجميع الملفات المبنية الجاهزة مع ملف `.nojekyll`:
+1. في صفحة **Settings → Pages**.
+2. أبقِ **Source** على `Deploy from a branch`.
+3. تحت **Branch**: اختر `main`، وبدلاً من `/(root)` اختر مجلد **`/docs`**.
+4. اضغط **Save**. سيعمل الموقع فورًا دون الحاجة لأي Actions.
 
-يُستخدم مفتاح Supabase browser-safe داخل الحزمة الأمامية فقط. لا تضع `SUPABASE_SECRET_KEY` أو `SUPABASE_MANAGEMENT_TOKEN` في GitHub أو ملفات البناء العامة.
+---
+
+## 📋 ما تم إصلاحه وتجهيزه في الكود:
+
+1. **إلغاء محرك Jekyll (`.nojekyll`)**:
+   - تم إنشاء ملف `.nojekyll` في المجلد الرئيسي وفي `docs/` لمنع GitHub من محاولة تحويل ملفات الـ Markdown كمدونة.
+2. **المسارات النسبية (`base: "./"`)**:
+   - تم ضبط Vite لاستخدام مسار نسبي بحيث تعمل الخطوط والصور وملفات الجافاسكربت على أي رابط أو مسار لمستودعك.
+3. **توفير نسخة مبنية مسبقاً في `docs/`**:
+   - مجلد `docs/` يحتوي الآن على `index.html`، ملفات الـ JS، والـ CSS المترجمة والمضغوطة.
+4. **تحديث سير عمل GitHub Actions**:
+   - تقسيم سير العمل في `.github/workflows/deploy-pages.yml` إلى مرحلتي `build` و `deploy` الرسمية لـ GitHub Pages.

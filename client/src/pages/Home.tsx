@@ -1,7 +1,13 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { supabase, type SupabaseRoomRow } from "@/lib/supabase";
+import AuthGate from "@/components/AuthGate";
 import AuthDialog from "@/components/AuthDialog";
 import MessagesPanel from "@/components/MessagesPanel";
+import SupabaseConnectDialog from "@/components/SupabaseConnectDialog";
+import GiftsStoreDialog from "@/components/GiftsStoreDialog";
+import LiveGiftAnimationOverlay from "@/components/LiveGiftAnimationOverlay";
+import { getUserCoins } from "@/lib/gifts";
 import { useSupabaseAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import {
@@ -10,10 +16,14 @@ import {
   ChevronDown,
   ChevronLeft,
   CircleHelp,
+  Coins,
+  Database,
+  Gift,
   Headphones,
   Home as HomeIcon,
   LayoutGrid,
   LockKeyhole,
+  LogOut,
   Menu,
   Mic,
   MicOff,
@@ -53,7 +63,93 @@ type Room = {
   private?: boolean;
 };
 
-const categories = ["الكل", "الأكثر نشاطًا", "تقنية", "ثقافة", "صباحي"];
+const categories = ["الكل", "الأكثر نشاطًا", "تقنية", "ثقافة", "صباحي", "ريادة أعمال"];
+
+export const initialSampleRooms: Room[] = [
+  {
+    id: "room-tech-ai",
+    title: "مستقبل الذكاء الاصطناعي وتطبيقاته في العالم العربي",
+    topic: "تقنية",
+    category: "تقنية",
+    listeners: 48,
+    status: "مباشر الآن",
+    accent: "coral",
+    host: "سارة المهندس",
+    hostInitials: "سم",
+    hostTone: "tone-coral",
+    members: [
+      { name: "سارة المهندس", role: "مضيف", initials: "سم", tone: "tone-coral", speaking: true },
+      { name: "أحمد كمال", role: "متحدث", initials: "أك", tone: "tone-teal", speaking: false },
+      { name: "ليلى العامري", role: "متحدث", initials: "لع", tone: "tone-violet", speaking: false },
+      { name: "طارق سليم", role: "مستمع", initials: "طس", tone: "tone-amber", speaking: false },
+      { name: "رنا يوسف", role: "مستمع", initials: "ري", tone: "tone-mint", speaking: false },
+    ],
+  },
+  {
+    id: "room-startups",
+    title: "رواد الأعمال: كيف تبني وتطلق أول منتج رقمي؟",
+    topic: "ريادة أعمال",
+    category: "ريادة أعمال",
+    listeners: 92,
+    status: "مباشر الآن",
+    accent: "teal",
+    host: "فيصل المطيري",
+    hostInitials: "فم",
+    hostTone: "tone-teal",
+    members: [
+      { name: "فيصل المطيري", role: "مضيف", initials: "فم", tone: "tone-teal", speaking: true },
+      { name: "عمر خالد", role: "متحدث", initials: "عخ", tone: "tone-coral", speaking: false },
+      { name: "نور الدين", role: "مستمع", initials: "ند", tone: "tone-violet", speaking: false },
+    ],
+  },
+  {
+    id: "room-morning-coffee",
+    title: "قهوة الصباح: حوار مفتوح وتطلعات الأسبوع الجديد",
+    topic: "صباحي",
+    category: "صباحي",
+    listeners: 64,
+    status: "مباشر الآن",
+    accent: "amber",
+    host: "نورة العلي",
+    hostInitials: "نع",
+    hostTone: "tone-amber",
+    members: [
+      { name: "نورة العلي", role: "مضيف", initials: "نع", tone: "tone-amber", speaking: false },
+      { name: "زيد الهاشمي", role: "متحدث", initials: "زه", tone: "tone-teal", speaking: true },
+      { name: "منى الدوسري", role: "مستمع", initials: "مد", tone: "tone-coral", speaking: false },
+    ],
+  },
+  {
+    id: "room-design-ux",
+    title: "تصميم تجربة المستخدم والهوية البصرية الرقمية",
+    topic: "تصميم",
+    category: "ثقافة",
+    listeners: 37,
+    status: "مباشر الآن",
+    accent: "violet",
+    host: "خالد بن صالح",
+    hostInitials: "خص",
+    hostTone: "tone-violet",
+    members: [
+      { name: "خالد بن صالح", role: "مضيف", initials: "خص", tone: "tone-violet", speaking: true },
+      { name: "ريم العتيبي", role: "متحدث", initials: "رع", tone: "tone-coral", speaking: false },
+    ],
+  },
+];
+
+function getInitialRooms(): Room[] {
+  try {
+    const raw = localStorage.getItem("sawtio_custom_rooms");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return initialSampleRooms;
+}
+
 const emptyRoom: Room = {
   id: "empty",
   title: "لا توجد غرف مباشرة بعد",
@@ -140,9 +236,10 @@ function RoomCard({ room, selected, onSelect }: { room: Room; selected: boolean;
 }
 
 export default function Home() {
-  const { user, loading: authLoading } = useSupabaseAuth();
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [currentRoomId, setCurrentRoomId] = useState("");
+  const [, setLocation] = useLocation();
+  const { user, loading: authLoading, signOut } = useSupabaseAuth();
+  const [rooms, setRooms] = useState<Room[]>(getInitialRooms);
+  const [currentRoomId, setCurrentRoomId] = useState(() => getInitialRooms()[0]?.id ?? "");
   const [activeCategory, setActiveCategory] = useState("الكل");
   const [search, setSearch] = useState("");
   const [joined, setJoined] = useState(false);
@@ -158,8 +255,31 @@ export default function Home() {
   const [isPrivate, setIsPrivate] = useState(false);
   const [activeView, setActiveView] = useState<"rooms" | "messages">("rooms");
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isDbConnectOpen, setIsDbConnectOpen] = useState(false);
+  const [dbVersion, setDbVersion] = useState(0);
+  const [isGiftsStoreOpen, setIsGiftsStoreOpen] = useState(false);
+  const [giftRecipient, setGiftRecipient] = useState<string>("");
+  const [userCoins, setUserCoins] = useState<number>(getUserCoins);
 
-  const currentRoom = rooms.find((room) => room.id === currentRoomId) ?? emptyRoom;
+  useEffect(() => {
+    const handleDbChange = () => {
+      setDbVersion((v) => v + 1);
+      setDatabaseState(supabase ? "loading" : "fallback");
+    };
+    const handleCoinsChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ balance: number }>;
+      setUserCoins(customEvent.detail?.balance ?? getUserCoins());
+    };
+
+    window.addEventListener("sawtio_supabase_change", handleDbChange);
+    window.addEventListener("sawtio_coins_change", handleCoinsChange);
+    return () => {
+      window.removeEventListener("sawtio_supabase_change", handleDbChange);
+      window.removeEventListener("sawtio_coins_change", handleCoinsChange);
+    };
+  }, []);
+
+  const currentRoom = rooms.find((room) => room.id === currentRoomId) ?? rooms[0] ?? emptyRoom;
   const userName = user?.user_metadata?.display_name || user?.email?.split("@")[0] || (authLoading ? "جارٍ التحقق" : "زائر");
   const userInitials = userName.slice(0, 2);
 
@@ -179,12 +299,12 @@ export default function Home() {
         .limit(50);
 
       if (cancelled) return;
-      if (error) {
-        console.warn("[Sawtio] Supabase rooms unavailable:", error.message);
+      if (error || !data || data.length === 0) {
+        console.warn("[Sawtio] Supabase rooms unavailable, using demo spaces:", error?.message);
         setDatabaseState("fallback");
         return;
       }
-      const loadedRooms = (data ?? []).map((row) => normalizeRoom(row as SupabaseRoomRow));
+      const loadedRooms = data.map((row) => normalizeRoom(row as SupabaseRoomRow));
       setRooms(loadedRooms);
       setCurrentRoomId(loadedRooms[0]?.id ?? "");
       setDatabaseState("connected");
@@ -201,7 +321,7 @@ export default function Home() {
       cancelled = true;
       void client.removeChannel(channel);
     };
-  }, []);
+  }, [dbVersion]);
 
   const filteredRooms = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -212,16 +332,12 @@ export default function Home() {
     });
   }, [activeCategory, rooms, search]);
 
-  const currentMembers = joined && !currentRoom.members.some((member) => member.name === "أنت")
-    ? [...currentRoom.members, { name: "أنت", role: "مستمع" as const, initials: "أنت", tone: "tone-coral" }]
+  const currentMembers: Member[] = joined && !currentRoom.members.some((member) => member.name === (userName || "أنت"))
+    ? [...currentRoom.members, { name: userName || "أنت", role: "مستمع", initials: userInitials || "أنت", tone: "tone-coral", speaking: false }]
     : currentRoom.members;
 
   const handleSelectRoom = (room: Room) => {
-    setCurrentRoomId(room.id);
-    setJoined(false);
-    micStream?.getTracks().forEach((track) => track.stop());
-    setMicStream(null);
-    setMicEnabled(false);
+    setLocation(`/room/${room.id}`);
   };
 
   const handleJoin = () => {
@@ -229,18 +345,7 @@ export default function Home() {
       toast.info("أنشئ أول غرفة لتبدأ البث الصوتي.");
       return;
     }
-    setJoined((value) => {
-      const next = !value;
-      toast.success(next ? `انضممت إلى «${currentRoom.title}»` : "غادرت الغرفة بنجاح", {
-        description: next ? "يمكنك الآن الاستماع والتفاعل مع المتحدثين." : "نراك في غرفة أخرى قريبًا.",
-      });
-      if (!next) {
-        micStream?.getTracks().forEach((track) => track.stop());
-        setMicStream(null);
-        setMicEnabled(false);
-      }
-      return next;
-    });
+    setLocation(`/room/${currentRoom.id}`);
   };
 
   const handleMicToggle = async () => {
@@ -253,9 +358,10 @@ export default function Home() {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         setMicStream(stream);
         setMicEnabled(true);
+        toast.success("تم تفعيل الميكروفون بنجاح", { description: "صوتك مسموع الآن للمستمعين في الغرفة." });
         return;
       } catch {
-        toast.info("يمكنك تفعيل الميكروفون عند السماح بالوصول للصوت.");
+        toast.info("يمكنك تفعيل الميكروفون عند السماح للمتصفح بالوصول للصوت.");
         return;
       }
     }
@@ -266,17 +372,15 @@ export default function Home() {
 
   const handleCreateRoom = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!user) {
-      setIsCreateOpen(false);
-      setIsAuthOpen(true);
-      toast.info("سجّل الدخول أولًا لإنشاء غرفة محفوظة باسمك.");
-      return;
-    }
     const trimmedTitle = newRoomTitle.trim();
     if (!trimmedTitle) {
       toast.error("أضف اسمًا للغرفة أولًا");
       return;
     }
+
+    const hostName = userName && userName !== "زائر" && userName !== "جارٍ التحقق" ? userName : "أنت";
+    const hostInitials = hostName.slice(0, 2);
+
     const draftRoom: Room = {
       id: `room-${Date.now()}`,
       title: trimmedTitle,
@@ -284,17 +388,19 @@ export default function Home() {
       category: "الأكثر نشاطًا",
       listeners: 1,
       status: "مباشر الآن",
-      accent: "coral",
-      host: "أنت",
-      hostInitials: "أنت",
+      accent: isPrivate ? "violet" : "coral",
+      host: hostName,
+      hostInitials,
       hostTone: "tone-coral",
       private: isPrivate,
-      members: [{ name: "أنت", role: "مضيف", initials: "أنت", tone: "tone-coral", speaking: true }],
+      members: [{ name: hostName, role: "مضيف", initials: hostInitials, tone: "tone-coral", speaking: true }],
     };
+
     setIsSavingRoom(true);
     let roomToAdd = draftRoom;
+
     try {
-      if (supabase) {
+      if (supabase && user && !user.app_metadata?.is_guest) {
         const { data, error } = await supabase
           .from("rooms")
           .insert({
@@ -313,22 +419,29 @@ export default function Home() {
           .single();
 
         if (error) {
-          console.warn("[Sawtio] Room was not persisted:", error.message);
+          console.warn("[Sawtio] Room was not persisted to Supabase:", error.message);
           setDatabaseState("fallback");
-          toast.warning("تم فتح الغرفة في وضع المعاينة", { description: "شغّل supabase/schema.sql لتفعيل الحفظ الدائم." });
+          toast.warning("تم فتح الغرفة في وضع المعاينة", { description: "غرفتك جاهزة ومباشرة الآن." });
         } else if (data) {
           roomToAdd = normalizeRoom(data as SupabaseRoomRow);
           setDatabaseState("connected");
         }
       }
 
-      setRooms((value) => [roomToAdd, ...value]);
+      setRooms((prev) => {
+        const next = [roomToAdd, ...prev.filter((r) => r.id !== roomToAdd.id)];
+        try {
+          localStorage.setItem("sawtio_custom_rooms", JSON.stringify(next.slice(0, 20)));
+        } catch {}
+        return next;
+      });
+
       setCurrentRoomId(roomToAdd.id);
-      setJoined(true);
       setIsCreateOpen(false);
       setNewRoomTitle("");
       setIsPrivate(false);
-      toast.success("غرفتك أصبحت مباشرة", { description: "شاركها مع أصدقائك وابدأ الحوار." });
+      toast.success("غرفتك أصبحت مباشرة!", { description: "أنت المضيف الآن ويمكنك التحدث وبدء الحوار." });
+      setLocation(`/room/${roomToAdd.id}`);
     } finally {
       setIsSavingRoom(false);
     }
@@ -339,14 +452,34 @@ export default function Home() {
       setIsAuthOpen(true);
       return;
     }
-    if (supabase) {
-      await supabase.auth.signOut();
-      toast.success("تم تسجيل الخروج");
-    }
+    await signOut();
+    toast.success("تم تسجيل الخروج بنجاح");
   };
+
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#0b1120", color: "#fff" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px" }}>
+          <Radio size={36} className="spin" style={{ color: "#ff7a68" }} />
+          <span style={{ fontSize: "12px", color: "#94a3b8" }}>جارٍ التحقق من الحساب…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthGate />;
+  }
 
   return (
     <div className="sawtio-app" dir="rtl">
+      {isMobileNavOpen && (
+        <div
+          className="mobile-sidebar-backdrop"
+          onClick={() => setIsMobileNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
       <aside className={`sidebar ${isMobileNavOpen ? "mobile-open" : ""}`}>
         <div className="sidebar-top">
           <BrandMark />
@@ -357,11 +490,13 @@ export default function Home() {
         <nav className="main-nav" aria-label="التنقل الرئيسي">
           <button className={`nav-item ${activeView === "rooms" ? "active" : ""}`} type="button" onClick={() => setActiveView("rooms")}><HomeIcon size={18} /><span>استكشف</span><i className="nav-pill">4</i></button>
           <button className={`nav-item ${activeView === "messages" ? "active" : ""}`} type="button" onClick={() => setActiveView("messages")}><Headphones size={18} /><span>محادثاتي</span></button>
+          <button className="nav-item" type="button" onClick={() => { setGiftRecipient(""); setIsGiftsStoreOpen(true); }}><Gift size={18} /><span>متجر الهدايا</span><i className="nav-pill" style={{ background: "#fef3c7", color: "#b45309", fontSize: "10px", fontWeight: 700 }}>🪙 {userCoins.toLocaleString()}</i></button>
           <button className="nav-item" type="button" onClick={() => toast.info("ستظهر الدعوات هنا عند وصولها") }><Bell size={18} /><span>دعواتي</span><i className="nav-notification">2</i></button>
         </nav>
 
         <div className="sidebar-section-label second-label">مساحتك</div>
         <nav className="main-nav">
+          <button className="nav-item" type="button" onClick={() => setIsDbConnectOpen(true)}><Database size={18} /><span>قاعدة البيانات</span></button>
           <button className="nav-item" type="button" onClick={() => setIsCreateOpen(true)}><Plus size={18} /><span>إنشاء غرفة</span></button>
           <button className="nav-item" type="button" onClick={() => toast.info("إعدادات الحساب ستكون متاحة قريبًا") }><Settings size={18} /><span>الإعدادات</span></button>
         </nav>
@@ -373,10 +508,10 @@ export default function Home() {
           <p>ابدأ غرفة حول فكرة تستحق أن تُسمع.</p>
           <button type="button" onClick={() => setIsCreateOpen(true)}>أنشئ غرفتك <ArrowUpLeft size={14} /></button>
         </div>
-        <button className="profile-chip" type="button" onClick={handleProfileClick}>
+        <button className="profile-chip" type="button" onClick={handleProfileClick} title="انقر لتسجيل الخروج">
           <Avatar initials={userInitials} tone="tone-profile" size="small" />
-          <span><strong>{userName}</strong><small>{user ? "حساب Supabase" : "سجّل الدخول للمحادثات"}</small></span>
-          <MoreHorizontal size={17} />
+          <span><strong>{userName}</strong><small>انقر لتسجيل الخروج</small></span>
+          <LogOut size={16} style={{ color: "#94a3b8", flexShrink: 0 }} />
         </button>
       </aside>
 
@@ -385,6 +520,30 @@ export default function Home() {
           <button className="mobile-menu" type="button" onClick={() => setIsMobileNavOpen(true)} aria-label="فتح القائمة"><Menu size={20} /></button>
           <div className="breadcrumbs"><span>الرئيسية</span><ChevronLeft size={14} /><strong>{activeView === "messages" ? "الرسائل الخاصة" : "استكشف الغرف"}</strong></div>
           <div className="topbar-actions">
+            <button
+              type="button"
+              onClick={() => { setGiftRecipient(""); setIsGiftsStoreOpen(true); }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                padding: "6px 12px",
+                borderRadius: "10px",
+                background: "linear-gradient(135deg, #fffbeb, #fef3c7)",
+                color: "#b45309",
+                border: "1px solid #fde68a",
+                fontSize: "11px",
+                fontWeight: 700,
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+              title="رصيد الكوينز ومتجر الهدايا"
+            >
+              <Coins size={14} style={{ color: "#d97706" }} />
+              <span>{userCoins.toLocaleString()}</span>
+              <span style={{ fontSize: "9px", color: "#d97706", fontWeight: "normal" }}>كوينز</span>
+              <Plus size={11} style={{ background: "#d97706", color: "#fff", borderRadius: "50%", padding: "1px", marginRight: "2px" }} />
+            </button>
             <label className="search-box">
               <Search size={17} />
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث عن غرفة أو موضوع" aria-label="البحث عن غرفة" />
@@ -405,7 +564,18 @@ export default function Home() {
               <h1>اسمع، شارك، <em>وكن حاضرًا.</em></h1>
               <p>الغرفة المناسبة قد تبدأ بسؤال صغير.</p>
             </div>
-            <div className="heading-actions"><div className={`database-badge ${databaseState}`}><span /> {databaseState === "loading" ? "جاري الاتصال" : databaseState === "connected" ? "Supabase متصلة" : "وضع العرض المحلي"}</div><button className="create-button" type="button" onClick={() => setIsCreateOpen(true)}><Plus size={17} /> أنشئ غرفة</button></div>
+            <div className="heading-actions">
+              <button
+                type="button"
+                className={`database-badge ${databaseState}`}
+                onClick={() => setIsDbConnectOpen(true)}
+                title="إعدادات واتصال Supabase"
+                style={{ cursor: "pointer", border: "1px solid", fontFamily: "inherit" }}
+              >
+                <span /> {databaseState === "loading" ? "جاري الاتصال" : databaseState === "connected" ? "Supabase متصلة" : "وضع العرض المحلي · انقر للربط"}
+              </button>
+              <button className="create-button" type="button" onClick={() => setIsCreateOpen(true)}><Plus size={17} /> أنشئ غرفة</button>
+            </div>
           </div>
 
           <section className="feature-room" aria-label="الغرفة المميزة">
@@ -435,10 +605,71 @@ export default function Home() {
               <div className="panel-heading"><div><span className="live-kicker"><i /> غرفة حية</span><h2>داخل الغرفة</h2></div><button className="panel-more" type="button" onClick={() => toast.info("خيارات الغرفة قيد الإعداد")} aria-label="المزيد"><MoreHorizontal size={19} /></button></div>
               <div className="current-room-mini"><div className={`mini-room-art art-${currentRoom.accent}`}><Radio size={17} /></div><div><strong>{currentRoom.title}</strong><span>{currentRoom.private ? "غرفة خاصة" : currentRoom.topic} · {currentRoom.listeners} مستمع</span></div></div>
               <div className="members-heading"><span>المشاركون <b>{currentMembers.length}</b></span><button type="button" onClick={() => toast.info("مشاركة رابط الغرفة قيد الإعداد")}>دعوة <ArrowUpLeft size={14} /></button></div>
-              <div className="members-list">{currentMembers.map((member, index) => <div className={`member-row ${member.name === "أنت" ? "self" : ""}`} key={`${member.name}-${index}`}><Avatar initials={member.initials} tone={member.tone} speaking={member.speaking} size="normal" /><div className="member-name"><strong>{member.name}</strong><span>{member.role}</span></div>{member.speaking && <span className="speaking-wave"><i /><i /><i /></span>}{member.name === "أنت" && <span className="you-badge">أنت</span>}</div>)}</div>
+              <div className="members-list">
+                {currentMembers.map((member, index) => (
+                  <div className={`member-row ${member.name === (userName || "أنت") ? "self" : ""}`} key={`${member.name}-${index}`}>
+                    <Avatar initials={member.initials} tone={member.tone} speaking={member.speaking} size="normal" />
+                    <div className="member-name">
+                      <strong>{member.name}</strong>
+                      <span>{member.role}</span>
+                    </div>
+                    {member.speaking && <span className="speaking-wave"><i /><i /><i /></span>}
+                    {member.name === (userName || "أنت") ? (
+                      <span className="you-badge">أنت</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGiftRecipient(member.name);
+                          setIsGiftsStoreOpen(true);
+                        }}
+                        style={{
+                          background: "#fff1ee",
+                          border: "1px solid #ffd4cd",
+                          color: "#d96051",
+                          borderRadius: "6px",
+                          padding: "2px 7px",
+                          fontSize: "10px",
+                          fontWeight: 600,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "3px",
+                          cursor: "pointer",
+                          marginRight: "auto",
+                        }}
+                        title={`إرسال هدية إلى ${member.name}`}
+                      >
+                        <Gift size={11} /> <span>إهداء</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
               <div className="panel-divider" />
               <div className="audio-status"><span className="status-signal"><i /><i /><i /><i /></span><div><strong>{joined ? "أنت متصل الآن" : "استمع قبل أن تنضم"}</strong><span>{joined ? "الصوت يعمل بجودة ممتازة" : "انضم لتشارك بصوتك"}</span></div></div>
-              <div className="room-controls"><button className={`control-button mic-control ${micEnabled ? "active" : ""}`} type="button" onClick={handleMicToggle} aria-label={micEnabled ? "كتم الميكروفون" : "تشغيل الميكروفون"}>{micEnabled ? <Mic size={19} /> : <MicOff size={19} />}<span>{micEnabled ? "الميكروفون يعمل" : "الميكروفون مكتوم"}</span></button><button className="control-button sound-control" type="button" onClick={() => setSpeakerEnabled((value) => !value)} aria-label={speakerEnabled ? "كتم الصوت" : "تشغيل الصوت"}>{speakerEnabled ? <Speaker size={18} /> : <VolumeX size={18} />}<span>{speakerEnabled ? "الصوت" : "صامت"}</span></button></div>
+              <div className="room-controls">
+                <button className={`control-button mic-control ${micEnabled ? "active" : ""}`} type="button" onClick={handleMicToggle} aria-label={micEnabled ? "كتم الميكروفون" : "تشغيل الميكروفون"}>{micEnabled ? <Mic size={19} /> : <MicOff size={19} />}<span>{micEnabled ? "الميكروفون يعمل" : "الميكروفون مكتوم"}</span></button>
+                <button className="control-button sound-control" type="button" onClick={() => setSpeakerEnabled((value) => !value)} aria-label={speakerEnabled ? "كتم الصوت" : "تشغيل الصوت"}>{speakerEnabled ? <Speaker size={18} /> : <VolumeX size={18} />}<span>{speakerEnabled ? "الصوت" : "صامت"}</span></button>
+                <button
+                  className="control-button gift-control"
+                  type="button"
+                  onClick={() => {
+                    setGiftRecipient(currentRoom.host || "المضيف");
+                    setIsGiftsStoreOpen(true);
+                  }}
+                  style={{
+                    background: "linear-gradient(135deg, #fff1ee, #ffe8e3)",
+                    color: "#d96051",
+                    border: "1px solid #ffc9be",
+                    cursor: "pointer",
+                  }}
+                  aria-label="إرسال هدية في الغرفة"
+                  title="متجر الهدايا وإرسال هدية"
+                >
+                  <Gift size={18} />
+                  <span>إهداء</span>
+                </button>
+              </div>
               <button className={`join-room-button ${joined ? "joined" : ""}`} type="button" onClick={handleJoin}>{joined ? "مغادرة الغرفة" : "انضمام إلى الغرفة"}<ChevronLeft size={17} /></button>
               <div className="panel-note"><CircleHelp size={14} /><span>يمكنك المغادرة في أي وقت دون أن يفوتك شيء.</span></div>
             </aside>
@@ -452,6 +683,17 @@ export default function Home() {
 
       {isCreateOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setIsCreateOpen(false); }}><form className="create-dialog" onSubmit={handleCreateRoom}><button className="dialog-close" type="button" onClick={() => setIsCreateOpen(false)} aria-label="إغلاق"><X size={18} /></button><div className="dialog-icon"><Radio size={22} /></div><div className="eyebrow compact"><span className="eyebrow-line" /> غرفة جديدة</div><h2>ما الفكرة التي تستحق صوتًا؟</h2><p>اصنع مساحة صغيرة لحوار كبير، وابدأها بطريقتك.</p><label>اسم الغرفة<input autoFocus value={newRoomTitle} onChange={(event) => setNewRoomTitle(event.target.value)} placeholder="مثال: جلسة شاي وموسيقى" /></label><label>موضوع الغرفة<select value={newRoomTopic} onChange={(event) => setNewRoomTopic(event.target.value)}><option>مجتمع</option><option>تصميم وتقنية</option><option>كتب وثقافة</option><option>رفاهية</option><option>صباحي</option></select></label><label className="privacy-toggle"><span className="toggle-copy"><strong>غرفة خاصة</strong><small>يمكن للأشخاص المدعوين فقط الدخول</small></span><input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} /><i className="toggle-track"><b /></i><LockKeyhole size={16} /></label><button className="dialog-submit" type="submit" disabled={isSavingRoom}>{isSavingRoom ? "جارٍ حفظ الغرفة…" : <>ابدأ الغرفة <ArrowUpLeft size={17} /></>}</button></form></div>}
       <AuthDialog open={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+      <SupabaseConnectDialog open={isDbConnectOpen} onClose={() => setIsDbConnectOpen(false)} />
+      <GiftsStoreDialog
+        open={isGiftsStoreOpen}
+        onClose={() => setIsGiftsStoreOpen(false)}
+        defaultRecipient={giftRecipient || currentRoom.host}
+        roomMembers={currentMembers}
+        currentRoomTitle={currentRoom.title}
+        currentRoomId={currentRoom.id}
+        currentUserName={userName}
+      />
+      <LiveGiftAnimationOverlay />
     </div>
   );
 }

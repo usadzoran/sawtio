@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sawtio — جارٍ التحويل...</title>
+    <script>
+      // Single Page Apps for GitHub Pages
+      // Redirects 404 paths to SPA hash routing
+      var pathSegmentsToKeep = 1;
+      var l = window.location;
+      if (l.hostname.indexOf('github.io') === -1) {
+        pathSegmentsToKeep = 0;
+      }
+      var path = l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/');
+      var base = l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/');
+      if (!base.endsWith('/')) base += '/';
+      var targetHash = '#' + (path ? '/' + path : '/');
+      window.location.replace(l.protocol + '//' + l.host + base + targetHash + (l.search ? l.search : ''));
+    </script>
+  </head>
+  <body style="font-family: sans-serif; text-align: center; padding: 50px 20px; color: #1d2532;">
+    <p>جارٍ نقلك إلى صفحة Sawtio...</p>
+    <p><a href="./#/" style="color: #ff7a68; text-decoration: none;">انقر هنا إذا لم يتم تحويلك تلقائيًا</a></p>
+  </body>
+</html>
