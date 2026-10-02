@@ -84,6 +84,8 @@ export default function RoomPage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ id: string; sender: string; senderId?: string; body: string; time: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
+  const [roomLoading, setRoomLoading] = useState(true);
+  const [roomNotFound, setRoomNotFound] = useState(false);
 
   // Load room data
   useEffect(() => {
@@ -98,26 +100,35 @@ export default function RoomPage() {
       }
     }
 
-    // If Supabase is available, load fresh details
-    if (supabase) {
-      void supabase
-        .from("rooms")
-        .select("*")
-        .eq("id", roomId)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (active && data) {
-            const row = data as SupabaseRoomRow;
-            setRoom((prev) => ({
-              ...prev,
-              id: row.id,
-              title: row.title,
-              topic: row.topic,
-              listeners: row.listener_count ?? prev.listeners,
-            }));
-          }
-        });
+    setRoomLoading(true);
+    setRoomNotFound(false);
+    if (!supabase || !roomId) {
+      setRoomLoading(false);
+      setRoomNotFound(true);
+      return () => { active = false; };
     }
+    void supabase
+      .from("rooms")
+      .select("*")
+      .eq("id", roomId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!active) return;
+        setRoomLoading(false);
+        if (error || !data) {
+          setRoomNotFound(true);
+          return;
+        }
+        const row = data as SupabaseRoomRow;
+        setRoom((prev) => ({
+          ...prev,
+          id: row.id,
+          title: row.title,
+          topic: row.topic,
+          listeners: row.listener_count ?? prev.listeners,
+        }));
+        if (row.host_id === user?.id) setUserRole("مضيف");
+      });
 
     return () => {
       active = false;
@@ -365,6 +376,30 @@ export default function RoomPage() {
 
   if (!user) {
     return <AuthGate />;
+  }
+
+  if (roomLoading) {
+    return (
+      <div dir="rtl" style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#0b1120", color: "#fff" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+          <Radio size={34} className="spin" style={{ color: "#ff7a68" }} />
+          <span style={{ color: "#94a3b8", fontSize: "12px" }}>جارٍ فتح الغرفة…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (roomNotFound) {
+    return (
+      <div dir="rtl" style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#0b1120", color: "#fff", padding: "20px" }}>
+        <div style={{ textAlign: "center", maxWidth: "360px" }}>
+          <Radio size={38} style={{ color: "#ff7a68", marginBottom: "14px" }} />
+          <h1 style={{ margin: "0 0 8px", fontSize: "22px" }}>الغرفة غير متاحة</h1>
+          <p style={{ margin: "0 0 20px", color: "#94a3b8", fontSize: "13px", lineHeight: 1.8 }}>قد تكون الغرفة أُغلقت أو أن الرابط غير صحيح.</p>
+          <button type="button" className="dialog-submit" onClick={() => setLocation("/")}>العودة إلى استكشاف الغرف <ArrowRight size={16} /></button>
+        </div>
+      </div>
+    );
   }
 
   return (

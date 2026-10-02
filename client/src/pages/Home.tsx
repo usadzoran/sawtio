@@ -418,6 +418,11 @@ export default function Home() {
       setIsPrivate(false);
       toast.success("غرفتك أصبحت مباشرة!", { description: "أنت المضيف الآن ويمكنك التحدث وبدء الحوار." });
       setLocation(`/room/${roomToAdd.id}`);
+    } catch (error) {
+      console.error("[Sawtio] Failed to create room", error);
+      toast.error("تعذر إنشاء الغرفة", {
+        description: "تأكد من تسجيل الدخول ثم حاول مرة أخرى.",
+      });
     } finally {
       setIsSavingRoom(false);
     }
