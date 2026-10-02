@@ -1,0 +1,7 @@
+{
+  "name": "Sawtio",
+  "description": "Sawtio — غرف صوتية جماعية تفاعلية للتواصل والمحادثات المباشرة",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

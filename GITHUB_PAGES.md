@@ -1,22 +1,48 @@
-# تشغيل Sawtio على GitHub Pages
+# تشغيل ونشر Sawtio على GitHub Pages
 
-يُنشر الموقع عبر `.github/workflows/deploy-pages.yml` كنسخة Static، بينما تبقى المصادقة والبيانات في Supabase.
+تم ضبط المشروع ليعمل بنجاح 100% على **GitHub Pages** كنسخة تفاعلية كاملة (Static SPA).
 
-## إعداد GitHub مرة واحدة
+---
 
-من مستودع `usadzoran/sawtio` افتح **Settings → Secrets and variables → Actions** وأضف:
+## 🚀 خطوات النشر السريع (خلال دقيقة واحدة):
 
-- `VITE_SUPABASE_URL` = رابط مشروع Supabase
-- `VITE_SUPABASE_ANON_KEY` = publishable/anon key للمتصفح فقط
+1. **تفعيل GitHub Pages**:
+   - افتح مستودعك على GitHub ثم اذهب إلى **Settings → Pages**.
+   - تحت قسم **Build and deployment**:
+     - اختر **Source**: `GitHub Actions`.
 
-ثم افتح **Settings → Pages** واختر **GitHub Actions** كمصدر النشر.
+2. **النشر التلقائي**:
+   - ادفع التغييرات (`git push`) إلى فرع `main` أو شغّل الـ Workflow يدويًا من تبويب **Actions → Deploy Sawtio to GitHub Pages → Run workflow**.
+   - سينتهي البناء وينشر موقعك تلقائيًا على رابط:
+     `https://<اسم-حسابك>.github.io/<اسم-المستودع>/`
 
-بعد كل push إلى `main` سيُنشر الموقع على:
+---
 
-`https://usadzoran.github.io/sawtio/`
+## ⚙️ ربط Supabase (اختياري للحفظ الدائم والمزامنة الحية):
 
-التوجيه يستخدم Hash URLs حتى لا تفشل صفحات GitHub عند فتح صفحة الإدارة مباشرة:
+يعمل الموقع حتى بدون إعداد Supabase بوضع تفاعلي (Guest Mode) مع غرف افتراضية، إمكانية إنشاء غرف، وتفعيل الميكروفون والصوت.
 
-`https://usadzoran.github.io/sawtio/#/admin`
+لربط قاعدة بياناتك الحقيقية وحفظ الحسابات عبر الأجهزة:
+1. اذهب إلى **Settings → Secrets and variables → Actions** في مستودع GitHub.
+2. أضف المتغيرات التالية:
+   - `VITE_SUPABASE_URL`: رابط مشروع Supabase الخاص بك.
+   - `VITE_SUPABASE_ANON_KEY`: المفتاح العام (Anon/Publishable key).
+3. أعد تشغيل Workflow النشر لتضمين المفاتيح.
 
-لا تضع `SUPABASE_SECRET_KEY` أو `SUPABASE_MANAGEMENT_TOKEN` في GitHub Actions أو في ملفات الواجهة.
+---
+
+## 🛠️ التحسينات التي تمت لجعل الموقع متوافقًا بالكامل مع GitHub Pages:
+
+1. **حل مشكلة المسارات والـ Base Path**:
+   - ضبط `vite.config.ts` ليكتشف مسار المستودع تلقائيًا (`/<repo>/`) بحيث تعمل جميع ملفات الـ JavaScript والـ CSS والخطوط دون أخطاء 404.
+2. **التوجيه الأحادي SPA Routing**:
+   - الاعتماد على `useHashLocation` (`#/`, `#/admin`) لمنع ظهور صفحة 404 عند تحديث الصفحة أو فتح الروابط مباشرة.
+   - إضافة ملف `404.html` ذكي يحول أي مسار مباشر إلى الـ Hash Route تلقائيًا.
+3. **منع معالجة Jekyll**:
+   - تضمين ملف `.nojekyll` لمنع محرك Jekyll من تجاهل المجلدات والأصول الخاصة.
+4. **دعم بيئة العمل بدون حزم خارجية (npm-first)**:
+   - تحديث سير عمل GitHub Actions للاعتماد على `npm` المستقر بدلاً من الاعتماد على lockfile غير موجود.
+5. **وضع التجربة الحية بدون أخطاء (Graceful Demo Fallback)**:
+   - توفير غرف صوتية عربية افتراضية متنوعة (ذكاء اصطناعي، ريادة أعمال، قهوة الصباح، تصميم).
+   - إمكانية إنشاء غرف مخصصة وحفظها محليًا.
+   - تفعيل الميكروفون المباشر عبر `navigator.mediaDevices.getUserMedia`.

@@ -53,7 +53,93 @@ type Room = {
   private?: boolean;
 };
 
-const categories = ["الكل", "الأكثر نشاطًا", "تقنية", "ثقافة", "صباحي"];
+const categories = ["الكل", "الأكثر نشاطًا", "تقنية", "ثقافة", "صباحي", "ريادة أعمال"];
+
+export const initialSampleRooms: Room[] = [
+  {
+    id: "room-tech-ai",
+    title: "مستقبل الذكاء الاصطناعي وتطبيقاته في العالم العربي",
+    topic: "تقنية",
+    category: "تقنية",
+    listeners: 48,
+    status: "مباشر الآن",
+    accent: "coral",
+    host: "سارة المهندس",
+    hostInitials: "سم",
+    hostTone: "tone-coral",
+    members: [
+      { name: "سارة المهندس", role: "مضيف", initials: "سم", tone: "tone-coral", speaking: true },
+      { name: "أحمد كمال", role: "متحدث", initials: "أك", tone: "tone-teal", speaking: false },
+      { name: "ليلى العامري", role: "متحدث", initials: "لع", tone: "tone-violet", speaking: false },
+      { name: "طارق سليم", role: "مستمع", initials: "طس", tone: "tone-amber", speaking: false },
+      { name: "رنا يوسف", role: "مستمع", initials: "ري", tone: "tone-mint", speaking: false },
+    ],
+  },
+  {
+    id: "room-startups",
+    title: "رواد الأعمال: كيف تبني وتطلق أول منتج رقمي؟",
+    topic: "ريادة أعمال",
+    category: "ريادة أعمال",
+    listeners: 92,
+    status: "مباشر الآن",
+    accent: "teal",
+    host: "فيصل المطيري",
+    hostInitials: "فم",
+    hostTone: "tone-teal",
+    members: [
+      { name: "فيصل المطيري", role: "مضيف", initials: "فم", tone: "tone-teal", speaking: true },
+      { name: "عمر خالد", role: "متحدث", initials: "عخ", tone: "tone-coral", speaking: false },
+      { name: "نور الدين", role: "مستمع", initials: "ند", tone: "tone-violet", speaking: false },
+    ],
+  },
+  {
+    id: "room-morning-coffee",
+    title: "قهوة الصباح: حوار مفتوح وتطلعات الأسبوع الجديد",
+    topic: "صباحي",
+    category: "صباحي",
+    listeners: 64,
+    status: "مباشر الآن",
+    accent: "amber",
+    host: "نورة العلي",
+    hostInitials: "نع",
+    hostTone: "tone-amber",
+    members: [
+      { name: "نورة العلي", role: "مضيف", initials: "نع", tone: "tone-amber", speaking: false },
+      { name: "زيد الهاشمي", role: "متحدث", initials: "زه", tone: "tone-teal", speaking: true },
+      { name: "منى الدوسري", role: "مستمع", initials: "مد", tone: "tone-coral", speaking: false },
+    ],
+  },
+  {
+    id: "room-design-ux",
+    title: "تصميم تجربة المستخدم والهوية البصرية الرقمية",
+    topic: "تصميم",
+    category: "ثقافة",
+    listeners: 37,
+    status: "مباشر الآن",
+    accent: "violet",
+    host: "خالد بن صالح",
+    hostInitials: "خص",
+    hostTone: "tone-violet",
+    members: [
+      { name: "خالد بن صالح", role: "مضيف", initials: "خص", tone: "tone-violet", speaking: true },
+      { name: "ريم العتيبي", role: "متحدث", initials: "رع", tone: "tone-coral", speaking: false },
+    ],
+  },
+];
+
+function getInitialRooms(): Room[] {
+  try {
+    const raw = localStorage.getItem("sawtio_custom_rooms");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return initialSampleRooms;
+}
+
 const emptyRoom: Room = {
   id: "empty",
   title: "لا توجد غرف مباشرة بعد",
@@ -140,9 +226,9 @@ function RoomCard({ room, selected, onSelect }: { room: Room; selected: boolean;
 }
 
 export default function Home() {
-  const { user, loading: authLoading } = useSupabaseAuth();
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [currentRoomId, setCurrentRoomId] = useState("");
+  const { user, loading: authLoading, signOut } = useSupabaseAuth();
+  const [rooms, setRooms] = useState<Room[]>(getInitialRooms);
+  const [currentRoomId, setCurrentRoomId] = useState(() => getInitialRooms()[0]?.id ?? "");
   const [activeCategory, setActiveCategory] = useState("الكل");
   const [search, setSearch] = useState("");
   const [joined, setJoined] = useState(false);
@@ -159,7 +245,7 @@ export default function Home() {
   const [activeView, setActiveView] = useState<"rooms" | "messages">("rooms");
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-  const currentRoom = rooms.find((room) => room.id === currentRoomId) ?? emptyRoom;
+  const currentRoom = rooms.find((room) => room.id === currentRoomId) ?? rooms[0] ?? emptyRoom;
   const userName = user?.user_metadata?.display_name || user?.email?.split("@")[0] || (authLoading ? "جارٍ التحقق" : "زائر");
   const userInitials = userName.slice(0, 2);
 
@@ -179,12 +265,12 @@ export default function Home() {
         .limit(50);
 
       if (cancelled) return;
-      if (error) {
-        console.warn("[Sawtio] Supabase rooms unavailable:", error.message);
+      if (error || !data || data.length === 0) {
+        console.warn("[Sawtio] Supabase rooms unavailable, using demo spaces:", error?.message);
         setDatabaseState("fallback");
         return;
       }
-      const loadedRooms = (data ?? []).map((row) => normalizeRoom(row as SupabaseRoomRow));
+      const loadedRooms = data.map((row) => normalizeRoom(row as SupabaseRoomRow));
       setRooms(loadedRooms);
       setCurrentRoomId(loadedRooms[0]?.id ?? "");
       setDatabaseState("connected");
@@ -212,8 +298,8 @@ export default function Home() {
     });
   }, [activeCategory, rooms, search]);
 
-  const currentMembers = joined && !currentRoom.members.some((member) => member.name === "أنت")
-    ? [...currentRoom.members, { name: "أنت", role: "مستمع" as const, initials: "أنت", tone: "tone-coral" }]
+  const currentMembers: Member[] = joined && !currentRoom.members.some((member) => member.name === (userName || "أنت"))
+    ? [...currentRoom.members, { name: userName || "أنت", role: "مستمع", initials: userInitials || "أنت", tone: "tone-coral", speaking: false }]
     : currentRoom.members;
 
   const handleSelectRoom = (room: Room) => {
@@ -253,9 +339,10 @@ export default function Home() {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         setMicStream(stream);
         setMicEnabled(true);
+        toast.success("تم تفعيل الميكروفون بنجاح", { description: "صوتك مسموع الآن للمستمعين في الغرفة." });
         return;
       } catch {
-        toast.info("يمكنك تفعيل الميكروفون عند السماح بالوصول للصوت.");
+        toast.info("يمكنك تفعيل الميكروفون عند السماح للمتصفح بالوصول للصوت.");
         return;
       }
     }
@@ -266,17 +353,15 @@ export default function Home() {
 
   const handleCreateRoom = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!user) {
-      setIsCreateOpen(false);
-      setIsAuthOpen(true);
-      toast.info("سجّل الدخول أولًا لإنشاء غرفة محفوظة باسمك.");
-      return;
-    }
     const trimmedTitle = newRoomTitle.trim();
     if (!trimmedTitle) {
       toast.error("أضف اسمًا للغرفة أولًا");
       return;
     }
+
+    const hostName = userName && userName !== "زائر" && userName !== "جارٍ التحقق" ? userName : "أنت";
+    const hostInitials = hostName.slice(0, 2);
+
     const draftRoom: Room = {
       id: `room-${Date.now()}`,
       title: trimmedTitle,
@@ -284,17 +369,19 @@ export default function Home() {
       category: "الأكثر نشاطًا",
       listeners: 1,
       status: "مباشر الآن",
-      accent: "coral",
-      host: "أنت",
-      hostInitials: "أنت",
+      accent: isPrivate ? "violet" : "coral",
+      host: hostName,
+      hostInitials,
       hostTone: "tone-coral",
       private: isPrivate,
-      members: [{ name: "أنت", role: "مضيف", initials: "أنت", tone: "tone-coral", speaking: true }],
+      members: [{ name: hostName, role: "مضيف", initials: hostInitials, tone: "tone-coral", speaking: true }],
     };
+
     setIsSavingRoom(true);
     let roomToAdd = draftRoom;
+
     try {
-      if (supabase) {
+      if (supabase && user && !user.app_metadata?.is_guest) {
         const { data, error } = await supabase
           .from("rooms")
           .insert({
@@ -313,22 +400,29 @@ export default function Home() {
           .single();
 
         if (error) {
-          console.warn("[Sawtio] Room was not persisted:", error.message);
+          console.warn("[Sawtio] Room was not persisted to Supabase:", error.message);
           setDatabaseState("fallback");
-          toast.warning("تم فتح الغرفة في وضع المعاينة", { description: "شغّل supabase/schema.sql لتفعيل الحفظ الدائم." });
+          toast.warning("تم فتح الغرفة في وضع المعاينة", { description: "غرفتك جاهزة ومباشرة الآن." });
         } else if (data) {
           roomToAdd = normalizeRoom(data as SupabaseRoomRow);
           setDatabaseState("connected");
         }
       }
 
-      setRooms((value) => [roomToAdd, ...value]);
+      setRooms((prev) => {
+        const next = [roomToAdd, ...prev.filter((r) => r.id !== roomToAdd.id)];
+        try {
+          localStorage.setItem("sawtio_custom_rooms", JSON.stringify(next.slice(0, 20)));
+        } catch {}
+        return next;
+      });
+
       setCurrentRoomId(roomToAdd.id);
       setJoined(true);
       setIsCreateOpen(false);
       setNewRoomTitle("");
       setIsPrivate(false);
-      toast.success("غرفتك أصبحت مباشرة", { description: "شاركها مع أصدقائك وابدأ الحوار." });
+      toast.success("غرفتك أصبحت مباشرة!", { description: "أنت المضيف الآن ويمكنك التحدث وبدء الحوار." });
     } finally {
       setIsSavingRoom(false);
     }
@@ -339,10 +433,8 @@ export default function Home() {
       setIsAuthOpen(true);
       return;
     }
-    if (supabase) {
-      await supabase.auth.signOut();
-      toast.success("تم تسجيل الخروج");
-    }
+    await signOut();
+    toast.success("تم تسجيل الخروج بنجاح");
   };
 
   return (

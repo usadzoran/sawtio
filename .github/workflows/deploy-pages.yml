@@ -24,29 +24,34 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.18.0
-      - name: Setup Node
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Verify Supabase browser configuration
+        run: npm install --legacy-peer-deps
+
+      - name: Check Supabase configuration
         run: |
-          test -n "$VITE_SUPABASE_URL" || (echo "Missing repository secret or variable VITE_SUPABASE_URL" && exit 1)
-          test -n "$VITE_SUPABASE_ANON_KEY" || (echo "Missing repository secret or variable VITE_SUPABASE_ANON_KEY" && exit 1)
+          if [ -n "$VITE_SUPABASE_URL" ] && [ -n "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "Supabase configuration detected."
+          else
+            echo "::warning::Supabase credentials not found in secrets or variables. Building with interactive demo & guest mode."
+          fi
+
       - name: Build static site
-        run: pnpm build:static
+        run: npm run build:static
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist/public
+
       - name: Deploy to Pages
         id: deployment
         uses: actions/deploy-pages@v4

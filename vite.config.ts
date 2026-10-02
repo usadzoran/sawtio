@@ -68,6 +68,10 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
   trimLogFile(logPath, MAX_LOG_SIZE_BYTES);
 }
 
+const isGitHubPagesBuild = process.env.GITHUB_PAGES === "true" || process.env.CI === "true";
+const githubRepoPath = process.env.GITHUB_REPOSITORY ? `/${process.env.GITHUB_REPOSITORY.split("/")[1]}/` : "/sawtio/";
+const base = process.env.BASE_PATH || (isGitHubPagesBuild ? githubRepoPath : "./");
+
 /**
  * Vite plugin to collect browser debug logs
  * - POST /__manus__/logs: Browser sends logs, written directly to files
@@ -79,7 +83,7 @@ function vitePluginManusDebugCollector(): Plugin {
     name: "manus-debug-collector",
 
     transformIndexHtml(html) {
-      if (process.env.NODE_ENV === "production") {
+      if (process.env.NODE_ENV === "production" || isGitHubPagesBuild) {
         return html;
       }
       return {
@@ -169,10 +173,9 @@ function vitePluginPublicPlatformConfig(): Plugin {
 }
 
 const plugins = [vitePluginPublicPlatformConfig(), react(), tailwindcss(), jsxLocPlugin(), vitePluginManusDebugCollector()];
-const isGitHubPagesBuild = process.env.GITHUB_PAGES === "true";
 
 export default defineConfig({
-  base: isGitHubPagesBuild ? "/sawtio/" : "/",
+  base,
   plugins,
   resolve: {
     alias: {
