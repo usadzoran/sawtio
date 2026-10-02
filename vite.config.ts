@@ -69,8 +69,7 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
 }
 
 const isGitHubPagesBuild = process.env.GITHUB_PAGES === "true" || process.env.CI === "true";
-const githubRepoPath = process.env.GITHUB_REPOSITORY ? `/${process.env.GITHUB_REPOSITORY.split("/")[1]}/` : "/sawtio/";
-const base = process.env.BASE_PATH || (isGitHubPagesBuild ? githubRepoPath : "./");
+const base = process.env.BASE_PATH || "./";
 
 /**
  * Vite plugin to collect browser debug logs
