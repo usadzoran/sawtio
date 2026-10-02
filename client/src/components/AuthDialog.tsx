@@ -1,8 +1,7 @@
 import { FormEvent, useState } from "react";
-import { ArrowUpLeft, Mail, ShieldCheck, UserCheck, X } from "lucide-react";
+import { ArrowUpLeft, Mail, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import { saveGuestUser } from "@/lib/auth";
 
 type AuthDialogProps = {
   open: boolean;
@@ -21,19 +20,12 @@ export default function AuthDialog({ open, onClose }: AuthDialogProps) {
     event.preventDefault();
     const normalizedEmail = email.trim();
 
-    if (!supabase) {
-      // In static / GitHub Pages mode without Supabase:
-      const name = displayName.trim() || normalizedEmail.split("@")[0] || "ضيف Sawtio";
-      saveGuestUser(name, normalizedEmail || undefined);
-      toast.success(`مرحبًا بك، ${name}!`, {
-        description: "تم تسجيل دخولك بنجاح في وضع العرض المباشر (GitHub Pages).",
-      });
-      onClose();
-      return;
-    }
-
     if (!normalizedEmail || !normalizedEmail.includes("@")) {
       toast.error("أدخل بريدًا إلكترونيًا صحيحًا.");
+      return;
+    }
+    if (!supabase) {
+      toast.error("تعذر الاتصال بقاعدة البيانات", { description: "أعد تحميل الموقع وحاول مرة أخرى." });
       return;
     }
 
@@ -49,15 +41,6 @@ export default function AuthDialog({ open, onClose }: AuthDialogProps) {
       return;
     }
     setSent(true);
-  };
-
-  const handleGuestLogin = () => {
-    const name = displayName.trim() || "ضيف Sawtio";
-    saveGuestUser(name);
-    toast.success(`مرحبًا بك، ${name}!`, {
-      description: "يمكنك الآن استكشاف الغرف، وتفعيل الصوت، والمشاركة.",
-    });
-    onClose();
   };
 
   return (
@@ -92,9 +75,7 @@ export default function AuthDialog({ open, onClose }: AuthDialogProps) {
           <>
             <h2 id="auth-title">ادخل إلى مساحتك.</h2>
             <p>
-              {supabase
-                ? "سجّل بريدك لتصلك روابط الدخول الآمنة وتحفظ غرفك."
-                : "يمكنك الدخول السريع باسمك لتجربة كافة مزايا الغرف الصوتية على صفحات GitHub."}
+              سجّل بريدك لتصلك روابط الدخول الآمنة وتحفظ غرفك في قاعدة البيانات.
             </p>
             <form onSubmit={handleSubmit}>
               <label className="auth-label">
@@ -109,7 +90,7 @@ export default function AuthDialog({ open, onClose }: AuthDialogProps) {
               <label className="auth-label">
                 البريد الإلكتروني
                 <input
-                  autoFocus={Boolean(supabase)}
+                  autoFocus
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
@@ -119,39 +100,14 @@ export default function AuthDialog({ open, onClose }: AuthDialogProps) {
               <button className="dialog-submit" type="submit" disabled={busy}>
                 {busy
                   ? "جارٍ المعالجة…"
-                  : supabase
-                    ? <>أرسل رابط الدخول <ArrowUpLeft size={17} /></>
-                    : <>متابعة الدخول <ArrowUpLeft size={17} /></>}
+                  : <>أرسل رابط الدخول <ArrowUpLeft size={17} /></>}
               </button>
             </form>
-
-            <div style={{ marginTop: "14px", textAlign: "center" }}>
-              <button
-                type="button"
-                onClick={handleGuestLogin}
-                style={{
-                  background: "transparent",
-                  border: "1px dashed #d5dce5",
-                  padding: "8px 14px",
-                  borderRadius: "8px",
-                  color: "#6b7787",
-                  fontSize: "11px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  cursor: "pointer",
-                }}
-              >
-                <UserCheck size={14} /> دخول سريع كضيف بدون بريد
-              </button>
-            </div>
 
             <div className="auth-note">
               <ShieldCheck size={14} />
               <span>
-                {supabase
-                  ? "لا نطلب كلمة مرور. الرابط صالح للاستخدام مرة واحدة."
-                  : "يعمل التطبيق كنسخة ثابتة على GitHub Pages بتجربة تفاعلية متكاملة."}
+                لا نطلب كلمة مرور. الرابط صالح للاستخدام مرة واحدة.
               </span>
             </div>
           </>

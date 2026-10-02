@@ -8,7 +8,6 @@ import {
   type GiftTransaction,
   getUserCoins,
   sendGift,
-  topUpCoins,
   VIRTUAL_GIFTS,
   type VirtualGift,
 } from "@/lib/gifts";
@@ -66,59 +65,15 @@ export default function GiftsStoreDialog({
   if (!open) return null;
 
   const handleSendGift = () => {
-    if (!selectedGift) {
-      toast.error("يرجى اختيار هدية أولاً.");
-      return;
-    }
-
-    const cleanRecipient = recipient.trim();
-    if (!cleanRecipient) {
-      toast.error("يرجى تحديد الشخص المستلم للهدية.");
-      return;
-    }
-
-    setSending(true);
-    const result = sendGift({
-      gift: selectedGift,
-      senderName: currentUserName,
-      recipientName: cleanRecipient,
-      roomId: currentRoomId,
-      roomTitle: currentRoomTitle,
-      message: message.trim(),
+    toast.info("إرسال الهدايا سيُفعّل بعد ربط الدفع الحقيقي", {
+      description: "لن يتم خصم أو إضافة أي كوينز محليًا.",
     });
-    setSending(false);
-
-    if (!result.success) {
-      toast.error(result.error || "فشل إرسال الهدية");
-      // If balance is not enough, open top up tab!
-      if (result.error?.includes("رصيدك")) {
-        setActiveTab("topup");
-      }
-      return;
-    }
-
-    toast.success(`تم إرسال ${selectedGift.name} إلى «${cleanRecipient}» بنجاح!`, {
-      description: "ظهرت الهدية للجميع في الغرفة الآن.",
-    });
-
-    setMessage("");
-    setCoinsBalance(getUserCoins());
-    setHistory(getGiftTransactions());
-    onClose();
   };
 
-  const handleBuyPack = (pack: CoinPack) => {
-    setBuyingPackId(pack.id);
-    setTimeout(() => {
-      const totalCoins = pack.coins + pack.bonus;
-      topUpCoins(totalCoins);
-      setCoinsBalance(getUserCoins());
-      setBuyingPackId(null);
-      toast.success(`تم شحن +${totalCoins} كوينز بنجاح!`, {
-        description: `رصيدك الجديد أصبح ${getUserCoins()} كوينز.`,
-      });
-      setActiveTab("store");
-    }, 400);
+  const handleBuyPack = (_pack: CoinPack) => {
+    toast.info("الدفع الحقيقي قيد الإعداد", {
+      description: "لن يتم شحن أي كوينز قبل تفعيل بوابة PayPal أو Stripe.",
+    });
   };
 
   return (
@@ -471,7 +426,7 @@ export default function GiftsStoreDialog({
         {activeTab === "topup" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "12px", overflowY: "auto", maxHeight: "420px" }}>
             <div style={{ background: "#fffbeb", padding: "12px", borderRadius: "10px", border: "1px solid #fef3c7", fontSize: "11px", color: "#92400e" }}>
-              💡 <strong>تجربة فورية:</strong> يمكنك شحن أي باقة فوراً لتجربة إرسال الهدايا لجميع المتحدثين في الغرف.
+              💳 <strong>الشحن الحقيقي:</strong> ستتوفر باقات العملات بعد تفعيل بوابة الدفع. لا يتم إضافة رصيد تجريبي.
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px" }}>
@@ -522,7 +477,7 @@ export default function GiftsStoreDialog({
                   <button
                     type="button"
                     onClick={() => handleBuyPack(pack)}
-                    disabled={buyingPackId === pack.id}
+                      disabled
                     style={{
                       width: "100%",
                       padding: "8px 0",
@@ -532,14 +487,15 @@ export default function GiftsStoreDialog({
                       fontSize: "11px",
                       fontWeight: 600,
                       border: 0,
-                      cursor: "pointer",
+                      cursor: "not-allowed",
+                      opacity: 0.55,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       gap: "6px",
                     }}
                   >
-                    <CreditCard size={13} /> {buyingPackId === pack.id ? "جارٍ الشحن…" : `شحن الآن (${pack.priceUsd}$)`}
+                    <CreditCard size={13} /> الدفع غير متاح حاليًا
                   </button>
                 </div>
               ))}

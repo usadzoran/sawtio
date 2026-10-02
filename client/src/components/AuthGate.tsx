@@ -15,12 +15,11 @@ import {
   ShieldCheck,
   Sparkles,
   User,
-  UserCheck,
   UserPlus,
   Volume2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { signInWithEmail, signUpWithEmail, saveGuestUser } from "@/lib/auth";
+import { signInWithEmail, signUpWithEmail } from "@/lib/auth";
 
 type AuthGateProps = {
   onSuccess?: () => void;
@@ -85,18 +84,8 @@ export default function AuthGate({ onSuccess }: AuthGateProps) {
       return;
     }
 
-    toast.success(`أهلاً بك يا ${displayName} في Sawtio! 🎉`, {
-      description: "تم إنشاء حسابك وتفعيل محفظتك مع 500 كوينز ترحيبية.",
-    });
-    onSuccess?.();
-  };
-
-  const handleInstantDemo = () => {
-    const demoNames = ["سالم الراشد", "ريما التميمي", "سعد المهندس", "فاطمة الزهراء", "طارق العلي"];
-    const randomName = demoNames[Math.floor(Math.random() * demoNames.length)];
-    saveGuestUser(randomName);
-    toast.success(`تم الدخول بحساب تجريبي مميز: ${randomName} 🚀`, {
-      description: "تم فتح كافة الغرف والمحادثات والمتجر برصيد 500 كوينز.",
+    toast.success(`أهلاً بك يا ${displayName} في Sawtio!`, {
+      description: "تم إنشاء حسابك الحقيقي عبر Supabase.",
     });
     onSuccess?.();
   };
@@ -201,7 +190,7 @@ export default function AuthGate({ onSuccess }: AuthGateProps) {
               {[
                 { icon: <Mic size={15} style={{ color: "#ff7a68" }} />, text: "غرف صوتية حية عالية النقاء بتفاعل لحظي" },
                 { icon: <Hand size={15} style={{ color: "#f59e0b" }} />, text: "خاصية رفع اليد لطلب الكلمة والمشاركة الصوتية" },
-                { icon: <Gift size={15} style={{ color: "#ec4899" }} />, text: "متجر هدايا افتراضية وكوينز ترحيبية فورية (500 كوينز)" },
+                { icon: <Gift size={15} style={{ color: "#ec4899" }} />, text: "متجر هدايا افتراضية مرتبط برصيد الحساب الحقيقي" },
                 { icon: <ShieldCheck size={15} style={{ color: "#32b9af" }} />, text: "خصوصية كاملة ورسائل مباشرة آمنة" },
               ].map((item, idx) => (
                 <div key={idx} style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "12px", color: "#cbd5e1" }}>
@@ -499,7 +488,7 @@ export default function AuthGate({ onSuccess }: AuthGateProps) {
                 }}
               >
                 <Gift size={15} style={{ flexShrink: 0 }} />
-                <span>هدية ترحيبية: 500 كوينز مجانًا فور التسجيل!</span>
+                <span>حساب حقيقي ورسائل وغرف محفوظة في قاعدة البيانات.</span>
               </div>
 
               <button
@@ -527,45 +516,6 @@ export default function AuthGate({ onSuccess }: AuthGateProps) {
             </form>
           )}
 
-          {/* DIVIDER */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              margin: "18px 0 14px",
-              color: "#64748b",
-              fontSize: "11px",
-            }}
-          >
-            <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.08)" }} />
-            <span>أو</span>
-            <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.08)" }} />
-          </div>
-
-          {/* INSTANT DEMO LOGIN */}
-          <button
-            type="button"
-            onClick={handleInstantDemo}
-            style={{
-              height: "42px",
-              borderRadius: "12px",
-              background: "rgba(255, 255, 255, 0.05)",
-              border: "1px dashed rgba(255, 255, 255, 0.2)",
-              color: "#cbd5e1",
-              fontSize: "12px",
-              fontWeight: 600,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              transition: "all 0.2s",
-            }}
-          >
-            <UserCheck size={16} style={{ color: "#32b9af" }} />
-            <span>تجربة فورية بنقرة واحدة (حساب تجريبي)</span>
-          </button>
         </div>
       </div>
 

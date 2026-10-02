@@ -149,7 +149,7 @@ export type GiftTransaction = {
 
 const WALLET_STORAGE_KEY = "sawtio_coins_balance";
 const TRANSACTIONS_STORAGE_KEY = "sawtio_gift_transactions";
-const DEFAULT_INITIAL_BALANCE = 500; // Free starter coins for new users to try gifts immediately!
+const DEFAULT_INITIAL_BALANCE = 0; // Coins are granted only after a verified payment.
 
 export function getUserCoins(): number {
   try {
@@ -159,7 +159,7 @@ export function getUserCoins(): number {
       if (!isNaN(parsed) && parsed >= 0) return parsed;
     }
   } catch {}
-  // Default starting gift coins
+  // No balance is created locally; payments will credit the real wallet.
   setUserCoins(DEFAULT_INITIAL_BALANCE);
   return DEFAULT_INITIAL_BALANCE;
 }

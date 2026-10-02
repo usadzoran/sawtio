@@ -139,13 +139,6 @@ export const initialSampleRooms: Room[] = [
 
 function getInitialRooms(): Room[] {
   try {
-    const raw = localStorage.getItem("sawtio_custom_rooms");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
   } catch {}
   return [];
 }
@@ -299,7 +292,7 @@ export default function Home() {
         .limit(50);
 
       if (cancelled) return;
-      if (error || !data || data.length === 0) {
+      if (error || !data) {
         console.warn("[Sawtio] Supabase rooms unavailable:", error?.message);
         setDatabaseState("fallback");
         return;

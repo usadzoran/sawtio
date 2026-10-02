@@ -116,15 +116,6 @@ export const emptyRoom: Room = {
 };
 
 export function getInitialRooms(): Room[] {
-  try {
-    const raw = localStorage.getItem("sawtio_custom_rooms");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch {}
   return [];
 }
 
