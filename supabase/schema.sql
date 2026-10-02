@@ -177,3 +177,15 @@ create policy "admins can read all direct messages"
 on public.direct_messages for select
 to authenticated
 using (public.is_admin(auth.uid()));
+
+-- Room creation policies for the existing rooms table.
+drop policy if exists "authenticated users can create rooms" on public.rooms;
+create policy "authenticated users can create rooms"
+on public.rooms for insert to authenticated
+with check (auth.uid() = host_id);
+
+drop policy if exists "hosts can update own rooms" on public.rooms;
+create policy "hosts can update own rooms"
+on public.rooms for update to authenticated
+using (auth.uid() = host_id)
+with check (auth.uid() = host_id);

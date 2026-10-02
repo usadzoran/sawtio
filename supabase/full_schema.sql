@@ -108,8 +108,8 @@ create policy "Allow users update own profile" on public.profiles for update usi
 create policy "Allow users insert own profile" on public.profiles for insert with check (auth.uid() = id);
 
 create policy "Allow public read rooms" on public.rooms for select using (true);
-create policy "Allow auth users create rooms" on public.rooms for insert with check (auth.role() = 'authenticated');
-create policy "Allow host update room" on public.rooms for update using (auth.uid() = host_id or auth.role() = 'authenticated');
+create policy "Allow auth users create rooms" on public.rooms for insert to authenticated with check (auth.uid() = host_id);
+create policy "Allow host update room" on public.rooms for update to authenticated using (auth.uid() = host_id) with check (auth.uid() = host_id);
 
 create policy "Allow public read room messages" on public.room_messages for select using (true);
 create policy "Allow auth users send room messages" on public.room_messages for insert with check (auth.role() = 'authenticated');
