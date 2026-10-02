@@ -125,7 +125,7 @@ export function getInitialRooms(): Room[] {
       }
     }
   } catch {}
-  return initialSampleRooms;
+  return [];
 }
 
 export function saveCustomRoom(room: Room): void {

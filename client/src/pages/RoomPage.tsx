@@ -82,10 +82,7 @@ export default function RoomPage() {
   const [userCoins, setUserCoins] = useState<number>(getUserCoins);
   const [reactions, setReactions] = useState<ReactionEmoji[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<{ id: string; sender: string; body: string; time: string }[]>([
-    { id: "1", sender: "سارة", body: "أهلاً بالجميع في مساحتنا اليوم! 🎙️", time: "10:04" },
-    { id: "2", sender: "أحمد", body: "موضوع رائع ومنتظر، يسعد صباحكم.", time: "10:05" },
-  ]);
+  const [chatMessages, setChatMessages] = useState<{ id: string; sender: string; senderId?: string; body: string; time: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
 
   // Load room data
@@ -126,6 +123,42 @@ export default function RoomPage() {
       active = false;
     };
   }, [roomId, userName]);
+
+  // Real room chat: load persisted messages and subscribe to new inserts.
+  useEffect(() => {
+    const client = supabase;
+    if (!client || !roomId) return;
+    let active = true;
+    const formatMessage = (row: { id: number | string; body: string; sender_id: string | null; created_at: string }) => ({
+      id: String(row.id),
+      sender: row.sender_id === user?.id ? userName : "عضو الغرفة",
+      senderId: row.sender_id ?? undefined,
+      body: row.body,
+      time: new Date(row.created_at).toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" }),
+    });
+    const loadMessages = async () => {
+      const { data, error } = await client
+        .from("room_messages")
+        .select("id, body, sender_id, created_at")
+        .eq("room_id", roomId)
+        .order("created_at", { ascending: true })
+        .limit(100);
+      if (!active || error || !data) return;
+      setChatMessages(data.map((row) => formatMessage(row as typeof row & { sender_id: string | null })));
+    };
+    void loadMessages();
+    const channel = client
+      .channel(`sawtio:room-messages:${roomId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "room_messages", filter: `room_id=eq.${roomId}` }, (payload) => {
+        const row = payload.new as { id: number | string; body: string; sender_id: string | null; created_at: string };
+        setChatMessages((prev) => prev.some((message) => message.id === String(row.id)) ? prev : [...prev, formatMessage(row)]);
+      })
+      .subscribe();
+    return () => {
+      active = false;
+      void client.removeChannel(channel);
+    };
+  }, [roomId, user?.id, userName]);
 
   // Sync coins
   useEffect(() => {
@@ -230,15 +263,9 @@ export default function RoomPage() {
         { userName, initials: userInitials, tone: "tone-coral", timestamp: Date.now() },
       ]);
 
-      // Simulated host approval after 4 seconds if testing alone
-      setTimeout(() => {
-        toast.success("🎉 وافق المضيف على طلبك للتحدث!", {
-          description: "تمت ترقيتك إلى متحدث، يمكنك الآن فتح الميكروفون والمشاركة.",
-        });
-        setUserRole("متحدث");
-        setIsHandRaised(false);
-        playGiftSound("rare");
-      }, 4500);
+      toast.info("تم إرسال الطلب للمضيف", {
+        description: "ستتلقى الإذن عند موافقة مضيف الغرفة.",
+      });
     } else {
       setIsHandRaised(false);
       setHandRaiseQueue((prev) => prev.filter((r) => r.userName !== userName));
@@ -292,16 +319,27 @@ export default function RoomPage() {
   };
 
   // Send Chat Message
-  const handleSendChat = (e: React.FormEvent) => {
+  const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
-    const newMsg = {
-      id: `msg-${Date.now()}`,
-      sender: userName,
-      body: chatInput.trim(),
-      time: new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" }),
-    };
-    setChatMessages((prev) => [...prev, newMsg]);
+    if (!supabase || !user) {
+      toast.error("تسجيل الدخول وقاعدة البيانات مطلوبان لإرسال الرسائل");
+      return;
+    }
+    const body = chatInput.trim();
+    const { data, error } = await supabase
+      .from("room_messages")
+      .insert({ room_id: roomId, sender_id: user.id, body, message_type: "text" })
+      .select("id, body, sender_id, created_at")
+      .single();
+    if (error || !data) {
+      toast.error("تعذر إرسال الرسالة", { description: error?.message });
+      return;
+    }
+    setChatMessages((prev) => {
+      if (prev.some((message) => message.id === String(data.id))) return prev;
+      return [...prev, { id: String(data.id), sender: userName, senderId: data.sender_id, body: data.body, time: new Date(data.created_at).toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" }) }];
+    });
     setChatInput("");
   };
 

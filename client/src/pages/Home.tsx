@@ -147,7 +147,7 @@ function getInitialRooms(): Room[] {
       }
     }
   } catch {}
-  return initialSampleRooms;
+  return [];
 }
 
 const emptyRoom: Room = {
@@ -300,7 +300,7 @@ export default function Home() {
 
       if (cancelled) return;
       if (error || !data || data.length === 0) {
-        console.warn("[Sawtio] Supabase rooms unavailable, using demo spaces:", error?.message);
+        console.warn("[Sawtio] Supabase rooms unavailable:", error?.message);
         setDatabaseState("fallback");
         return;
       }
@@ -377,6 +377,12 @@ export default function Home() {
       toast.error("أضف اسمًا للغرفة أولًا");
       return;
     }
+    if (!supabase || !user || user.app_metadata?.is_guest) {
+      toast.error("يجب ربط Supabase وتسجيل الدخول أولًا", {
+        description: "لا يتم حفظ الغرف في المتصفح؛ كل غرفة تُحفظ في قاعدة البيانات الحقيقية.",
+      });
+      return;
+    }
 
     const hostName = userName && userName !== "زائر" && userName !== "جارٍ التحقق" ? userName : "أنت";
     const hostInitials = hostName.slice(0, 2);
@@ -397,11 +403,8 @@ export default function Home() {
     };
 
     setIsSavingRoom(true);
-    let roomToAdd = draftRoom;
-
     try {
-      if (supabase && user && !user.app_metadata?.is_guest) {
-        const { data, error } = await supabase
+      const { data, error } = await supabase
           .from("rooms")
           .insert({
             host_id: user.id,
@@ -418,23 +421,12 @@ export default function Home() {
           .select()
           .single();
 
-        if (error) {
-          console.warn("[Sawtio] Room was not persisted to Supabase:", error.message);
-          setDatabaseState("fallback");
-          toast.warning("تم فتح الغرفة في وضع المعاينة", { description: "غرفتك جاهزة ومباشرة الآن." });
-        } else if (data) {
-          roomToAdd = normalizeRoom(data as SupabaseRoomRow);
-          setDatabaseState("connected");
-        }
+      if (error || !data) {
+        throw new Error(error?.message || "تعذر حفظ الغرفة");
       }
-
-      setRooms((prev) => {
-        const next = [roomToAdd, ...prev.filter((r) => r.id !== roomToAdd.id)];
-        try {
-          localStorage.setItem("sawtio_custom_rooms", JSON.stringify(next.slice(0, 20)));
-        } catch {}
-        return next;
-      });
+      const roomToAdd = normalizeRoom(data as SupabaseRoomRow);
+      setRooms((prev) => [roomToAdd, ...prev.filter((r) => r.id !== roomToAdd.id)]);
+      setDatabaseState("connected");
 
       setCurrentRoomId(roomToAdd.id);
       setIsCreateOpen(false);
@@ -572,7 +564,7 @@ export default function Home() {
                 title="إعدادات واتصال Supabase"
                 style={{ cursor: "pointer", border: "1px solid", fontFamily: "inherit" }}
               >
-                <span /> {databaseState === "loading" ? "جاري الاتصال" : databaseState === "connected" ? "Supabase متصلة" : "وضع العرض المحلي · انقر للربط"}
+                <span /> {databaseState === "loading" ? "جاري الاتصال" : databaseState === "connected" ? "Supabase متصلة" : "قاعدة البيانات غير متصلة · اضغط للربط"}
               </button>
               <button className="create-button" type="button" onClick={() => setIsCreateOpen(true)}><Plus size={17} /> أنشئ غرفة</button>
             </div>

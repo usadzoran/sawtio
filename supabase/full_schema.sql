@@ -149,11 +149,5 @@ begin
 exception when duplicate_object then null;
 end $$;
 
--- إدراج غرف صوتية تجريبية للبدء فوراً
-insert into public.rooms (slug, title, topic, cover_color, status, max_speakers, listener_count, tags)
-values
-  ('ai-future-arab-world', 'مستقبل الذكاء الاصطناعي وتطبيقاته في العالم العربي', 'تقنية', '#ff7a68', 'live', 10, 48, array['تقنية', 'ذكاء اصطناعي']),
-  ('entrepreneurs-launching-products', 'رواد الأعمال: كيف تبني وتطلق أول منتج رقمي؟', 'ريادة أعمال', '#32b9af', 'live', 8, 92, array['ريادة أعمال', 'شركات ناشئة']),
-  ('morning-coffee-thoughts', 'قهوة الصباح: حوار مفتوح وتطلعات الأسبوع الجديد', 'صباحي', '#e9ad4d', 'live', 12, 64, array['صباحي', 'حوار مفتوح']),
-  ('ui-ux-modern-identity', 'تصميم تجربة المستخدم والهوية البصرية الرقمية', 'تصميم', '#9d7bea', 'live', 6, 37, array['تصميم', 'واجهات'])
-on conflict (slug) do nothing;
+-- لا تُدرج بيانات تجريبية هنا. الغرف تُنشأ من التطبيق بعد تسجيل الدخول
+-- وتُحفظ في public.rooms مع ربطها بالمستخدم الحقيقي عبر host_id.
