@@ -1,22 +1,29 @@
 # تشغيل Sawtio على GitHub Pages
 
-يُنشر الموقع عبر `.github/workflows/deploy-pages.yml` كنسخة Static، بينما تبقى المصادقة والبيانات في Supabase.
+تم تجهيز نسخة Static من تطبيق React في جذر المستودع حتى تعمل مع إعداد GitHub Pages الحالي:
 
-## إعداد GitHub مرة واحدة
+- **Source:** `main`
+- **Folder:** `/ (root)`
+- **URL:** https://usadzoran.github.io/sawtio/
 
-من مستودع `usadzoran/sawtio` افتح **Settings → Secrets and variables → Actions** وأضف:
+التوجيه الداخلي يستخدم Hash URLs، لذلك لوحة الإدارة تفتح عبر:
 
-- `VITE_SUPABASE_URL` = رابط مشروع Supabase
-- `VITE_SUPABASE_ANON_KEY` = publishable/anon key للمتصفح فقط
+https://usadzoran.github.io/sawtio/#/admin
 
-ثم افتح **Settings → Pages** واختر **GitHub Actions** كمصدر النشر.
+## تحديث النسخة المنشورة
 
-بعد كل push إلى `main` سيُنشر الموقع على:
+بعد تعديل الواجهة شغّل:
 
-`https://usadzoran.github.io/sawtio/`
+```bash
+GITHUB_PAGES=true pnpm build:static
+rm -rf assets api __manus__
+cp -r dist/public/assets assets
+cp -r dist/public/api api
+cp -r dist/public/__manus__ __manus__
+cp dist/public/index.html index.html
+cp dist/public/manus-routes.json manus-routes.json
+touch .nojekyll
+git add . && git commit -m "Update GitHub Pages build" && git push origin main
+```
 
-التوجيه يستخدم Hash URLs حتى لا تفشل صفحات GitHub عند فتح صفحة الإدارة مباشرة:
-
-`https://usadzoran.github.io/sawtio/#/admin`
-
-لا تضع `SUPABASE_SECRET_KEY` أو `SUPABASE_MANAGEMENT_TOKEN` في GitHub Actions أو في ملفات الواجهة.
+يُستخدم مفتاح Supabase browser-safe داخل الحزمة الأمامية فقط. لا تضع `SUPABASE_SECRET_KEY` أو `SUPABASE_MANAGEMENT_TOKEN` في GitHub أو ملفات البناء العامة.
