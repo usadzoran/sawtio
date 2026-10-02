@@ -6,6 +6,7 @@ import { useHashLocation } from "wouter/use-hash-location";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import RoomPage from "./pages/RoomPage";
 import AdminPanel from "./pages/AdminPanel";
 
 function Router() {
@@ -14,6 +15,7 @@ function Router() {
     <WouterRouter hook={useHashLocation}>
       <Switch>
         <Route path={"/"} component={Home} />
+        <Route path={"/room/:id"} component={RoomPage} />
         <Route path={"/admin"} component={AdminPanel} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}

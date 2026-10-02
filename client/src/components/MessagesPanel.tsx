@@ -33,6 +33,14 @@ export default function MessagesPanel({ user, onRequestAuth }: MessagesPanelProp
   const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
 
+  const [dbVersion, setDbVersion] = useState(0);
+
+  useEffect(() => {
+    const handleDbChange = () => setDbVersion((v) => v + 1);
+    window.addEventListener("sawtio_supabase_change", handleDbChange);
+    return () => window.removeEventListener("sawtio_supabase_change", handleDbChange);
+  }, []);
+
   const visibleProfiles = useMemo(() => {
     const query = search.trim().toLowerCase();
     return profiles.filter((profile) => !query || profile.display_name.toLowerCase().includes(query));
@@ -49,14 +57,14 @@ export default function MessagesPanel({ user, onRequestAuth }: MessagesPanelProp
       if (cancelled) return;
       setLoadingProfiles(false);
       if (error) {
-        toast.error("تعذر تحميل قائمة المستخدمين", { description: "تأكد من تشغيل supabase/schema.sql." });
+        toast.error("تعذر تحميل قائمة المستخدمين", { description: "تأكد من تشغيل supabase/full_schema.sql." });
         return;
       }
       setProfiles((data ?? []) as Profile[]);
     };
     void loadProfiles();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, dbVersion]);
 
   useEffect(() => {
     const client = supabase;
